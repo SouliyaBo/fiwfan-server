@@ -1,0 +1,35 @@
+version: "3"
+
+services:
+  server:
+    container_name: server
+    build: .
+    restart: always
+    ports:
+      - "${PORT:-8080}:${PORT:-8080}"
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=mongodb://mongo:27017/fiwfan
+    depends_on:
+      - mongo
+    networks:
+      - server-network
+
+  mongo:
+    image: mongo:6
+    container_name: mongo
+    restart: always
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - server-network
+
+networks:
+  server-network:
+    driver: bridge
+
+volumes:
+  mongo_data:
