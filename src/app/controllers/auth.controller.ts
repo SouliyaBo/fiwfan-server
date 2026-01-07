@@ -179,21 +179,22 @@ export const telegramLogin = async (req: Request, res: Response) => {
         }
 
         // 1. Verify Hash
-        const dataCheckArr = [];
-        if (auth_date) dataCheckArr.push(`auth_date=${auth_date}`);
-        if (first_name) dataCheckArr.push(`first_name=${first_name}`);
-        if (id) dataCheckArr.push(`id=${id}`);
-        if (photo_url) dataCheckArr.push(`photo_url=${photo_url}`);
-        if (username) dataCheckArr.push(`username=${username}`);
+        // Create data check string by sorting all keys alphabetically (except hash)
+        const dataCheckArr = Object.keys(req.body)
+            .filter(key => key !== 'hash')
+            .sort()
+            .map(key => `${key}=${req.body[key]}`);
 
-        // Telegram requires alphabetical sort
-        dataCheckArr.sort();
         const dataCheckString = dataCheckArr.join('\n');
 
         const secretKey = crypto.createHash('sha256').update(botToken).digest();
         const hmac = crypto.createHmac('sha256', secretKey).update(dataCheckString).digest('hex');
 
-        // Allow bypass in development
+        // Debugging logs (careful not to expose sensitive info in prod logs if possible, or temporary)
+        console.log("Received Hash:", hash);
+        console.log("Calculated HMAC:", hmac);
+        console.log("Data String:", dataCheckString);
+
         if (process.env.NODE_ENV === 'development' && hash === 'mock_hash_for_dev') {
             // Bypass for testing
         } else if (hmac !== hash) {
