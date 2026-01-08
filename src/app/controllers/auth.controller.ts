@@ -207,25 +207,20 @@ export const telegramLogin = async (req: Request, res: Response) => {
             return res.status(401).json({ message: 'Authentication data is outdated' });
         }
 
-        // 3. Find or Create User
+        // 3. Find User
         let user = await User.findOne({ telegramId: id.toString() });
 
         if (!user) {
-            // Check if user already exists with this generic email? (unlikely for Telegram login unless linked)
-            // Create new user
-            user = new User({
-                telegramId: id.toString(),
-                telegramUsername: username,
-                telegramPhotoUrl: photo_url,
-                displayName: first_name,
-                username: username || `user_${id}`,
-                role: Role.USER, // Default to USER
-                email: `${id}@telegram.user`, // Placeholder email or handle differently
-                isCreator: false
+            // New Flow: Return "User not found" so frontend can show Role Selection
+            // We return the payload back so frontend can use it to register
+            return res.status(202).json({
+                isNewUser: true,
+                telegramData: req.body
             });
-            await user.save();
-        } else {
-            // Update info
+        }
+
+        // Update info for existing user
+        if (user.telegramUsername !== username || user.telegramPhotoUrl !== photo_url) {
             user.telegramUsername = username;
             user.telegramPhotoUrl = photo_url;
             await user.save();
@@ -248,6 +243,91 @@ export const telegramLogin = async (req: Request, res: Response) => {
 
     } catch (error: any) {
         console.error("Telegram Login Error:", error);
+        res.status(500).json({ message: error.message });
+    }
+};
+
+export const completeTelegramRegistration = async (req: Request, res: Response) => {
+    try {
+        const { telegramData, role, creatorType } = req.body;
+        const { id, first_name, username, photo_url, hash } = telegramData;
+
+        // Re-Verify Hash (Security best practice: verify again before creating account)
+        const botToken = process.env.TELEGRAM_BOT_TOKEN;
+        if (!botToken) return res.status(500).json({ message: 'Server configuration error' });
+
+        // Create data check string by sorting all keys alphabetically (except hash)
+        const dataCheckArr = Object.keys(telegramData)
+            .filter(key => key !== 'hash')
+            .sort()
+            .map(key => `${key}=${telegramData[key]}`);
+
+        const dataCheckString = dataCheckArr.join('\n');
+        const secretKey = crypto.createHash('sha256').update(botToken).digest();
+        const hmac = crypto.createHmac('sha256', secretKey).update(dataCheckString).digest('hex');
+
+        if (process.env.NODE_ENV === 'development' && hash === 'mock_hash_for_dev') {
+            // Bypass
+        } else if (hmac !== hash) {
+            return res.status(401).json({ message: 'Invalid Telegram authentication' });
+        }
+
+        // Check if user exists again
+        let existingUser = await User.findOne({ telegramId: id.toString() });
+        if (existingUser) {
+            return res.status(400).json({ message: 'User already exists' });
+        }
+
+        let finalRole = role || Role.USER;
+        if (role === Role.CREATOR && creatorType === 'AGENCY') {
+            finalRole = Role.AGENCY;
+        }
+
+        const newUser = new User({
+            telegramId: id.toString(),
+            telegramUsername: username,
+            telegramPhotoUrl: photo_url,
+            displayName: first_name,
+            username: username || `user_${id}`,
+            role: finalRole,
+            email: `${id}@telegram.user`, // Temporary email
+            isCreator: finalRole === Role.CREATOR || finalRole === Role.AGENCY
+        });
+
+        await newUser.save();
+
+        if (finalRole === Role.CREATOR) {
+            const newCreator = new Creator({
+                user: newUser._id,
+                displayName: newUser.username
+            });
+            await newCreator.save();
+        } else if (finalRole === Role.AGENCY) {
+            const newAgency = new Agency({
+                name: (newUser.username || "My") + " Agency",
+                owner: newUser._id,
+                description: "Agency description...",
+                location: "Bangkok"
+            });
+            await newAgency.save();
+        }
+
+        const token = jwt.sign({ id: newUser._id, role: newUser.role }, process.env.JWT_SECRET || 'secret', { expiresIn: '1d' });
+
+        res.status(201).json({
+            token,
+            user: {
+                id: newUser._id,
+                username: newUser.username,
+                role: newUser.role,
+                avatarUrl: newUser.telegramPhotoUrl,
+                displayName: newUser.displayName,
+                email: newUser.email
+            }
+        });
+
+    } catch (error: any) {
+        console.error("Telegram Register Error:", error);
         res.status(500).json({ message: error.message });
     }
 };
