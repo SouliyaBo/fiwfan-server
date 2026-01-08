@@ -247,29 +247,44 @@ export const getRecommendedCreators = async (req: Request, res: Response) => {
     try {
         const { excludeId } = req.query;
 
-        let matchStage: any = {};
-        if (excludeId) {
-            matchStage._id = { $ne: new Object(excludeId) }; // Note: Ensure logic handles ObjectId conversion if strict
-        }
+        // 1. Get users with ACTIVE subscription
+        const activeSubs = await Subscription.find({
+            status: SubscriptionStatus.ACTIVE,
+            endDate: { $gt: new Date() }
+        }).distinct('user'); // Get distinct user IDs
 
-        // Using aggregation for random sampling
-        const recommended = await Creator.aggregate([
-            // 1. Match active/verified creators if you have such fields (optional for now)
-            // { $match: { isVerified: true } }, 
+        // 2. Build Aggregation
+        const pipeline: any[] = [
+            {
+                $match: {
+                    user: { $in: activeSubs }, // Only creators with active sub
+                    ...(excludeId ? { _id: { $ne: new (await import('mongoose')).Types.ObjectId(excludeId as string) } } : {})
+                }
+            },
+            { $sample: { size: 4 } }
+        ];
 
-            // 2. Exclude current creator if ID provided
-            ...(excludeId ? [{ $match: { _id: { $ne: new (await import('mongoose')).Types.ObjectId(excludeId as string) } } }] : []),
+        const recommended = await Creator.aggregate(pipeline);
 
-            // 3. Random sample of 4
-            { $sample: { size: 4 } },
-        ]);
-
-        // 4. Manually populate user data since aggregate doesn't do it automatically like find().populate()
-        // Or we can just fetch IDs and then find().populate()
-
+        // 3. Populate User Data
         const populatedRecommended = await Creator.populate(recommended, { path: 'user', select: 'avatarUrl' });
 
-        res.json(populatedRecommended);
+        // 4. Attach Active Subscription Object (needed for frontend logic)
+        // Since we filtered by activeSubs, we know they have one, but we need the details (planType etc)
+        const result = await Promise.all(populatedRecommended.map(async (creator: any) => {
+            const sub = await Subscription.findOne({
+                user: creator.user._id || creator.user, // Handle populated or not
+                status: SubscriptionStatus.ACTIVE,
+                endDate: { $gt: new Date() }
+            }).select('planType status endDate');
+
+            return {
+                ...creator,
+                activeSubscription: sub
+            };
+        }));
+
+        res.json(result);
 
     } catch (error: any) {
         res.status(500).json({ message: error.message });

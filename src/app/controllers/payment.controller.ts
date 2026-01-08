@@ -167,14 +167,21 @@ export const subscribe = async (req: any, res: Response) => {
 export const getMySubscription = async (req: any, res: Response) => {
     try {
         const userId = req.user.id;
+
         // Find latest active
-        const sub = await Subscription.findOne({
+        const active = await Subscription.findOne({
             user: userId,
             status: SubscriptionStatus.ACTIVE,
             endDate: { $gt: new Date() }
         }).sort({ endDate: -1 });
 
-        res.json(sub || null);
+        // Find latest pending
+        const pending = await Subscription.findOne({
+            user: userId,
+            status: SubscriptionStatus.PENDING
+        }).sort({ createdAt: -1 });
+
+        res.json({ active, pending });
     } catch (error: any) {
         res.status(500).json({ message: error.message });
     }
