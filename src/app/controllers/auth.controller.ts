@@ -331,3 +331,63 @@ export const completeTelegramRegistration = async (req: Request, res: Response) 
         res.status(500).json({ message: error.message });
     }
 };
+
+export const telegramResetPasswordRequest = async (req: Request, res: Response) => {
+    try {
+        const { id, first_name, username, photo_url, auth_date, hash } = req.body;
+        const botToken = process.env.TELEGRAM_BOT_TOKEN;
+
+        if (!botToken) {
+            return res.status(500).json({ message: 'Server configuration error: TELEGRAM_BOT_TOKEN missing' });
+        }
+
+        // 1. Verify Hash
+        const dataCheckArr = Object.keys(req.body)
+            .filter(key => key !== 'hash')
+            .sort()
+            .map(key => `${key}=${req.body[key]}`);
+
+        const dataCheckString = dataCheckArr.join('\n');
+        const secretKey = crypto.createHash('sha256').update(botToken).digest();
+        const hmac = crypto.createHmac('sha256', secretKey).update(dataCheckString).digest('hex');
+
+        if (process.env.NODE_ENV === 'development' && hash === 'mock_hash_for_dev') {
+            // Bypass
+        } else if (hmac !== hash) {
+            return res.status(401).json({ message: 'Invalid Telegram authentication' });
+        }
+
+        // 2. Check stale data
+        const now = Math.floor(Date.now() / 1000);
+        if (now - auth_date > 86400) {
+            return res.status(401).json({ message: 'Authentication data is outdated' });
+        }
+
+        // 3. Find User by Telegram ID
+        const user = await User.findOne({ telegramId: id.toString() });
+
+        if (!user) {
+            return res.status(404).json({ message: 'ไม่พบบัญชีที่เชื่อมต่อกับ Telegram นี้' });
+        }
+
+        // 4. Generate Reset Token (Reuse existing logic)
+        const resetToken = crypto.randomBytes(20).toString('hex');
+        const resetPasswordToken = crypto.createHash('sha256').update(resetToken).digest('hex');
+        const resetPasswordExpires = Date.now() + 15 * 60 * 1000; // 15 minutes
+
+        user.resetPasswordToken = resetPasswordToken;
+        user.resetPasswordExpires = new Date(resetPasswordExpires);
+
+        await user.save();
+
+        // Return the RAW reset token so frontend can use it immediately
+        res.status(200).json({
+            success: true,
+            resetToken: resetToken
+        });
+
+    } catch (error: any) {
+        console.error("Telegram Reset Request Error:", error);
+        res.status(500).json({ message: error.message });
+    }
+};

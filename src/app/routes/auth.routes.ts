@@ -9,5 +9,6 @@ router.post('/forgotpassword', forgotPassword);
 router.put('/resetpassword/:resetToken', resetPassword);
 router.post('/telegram', telegramLogin);
 router.post('/telegram/register', require('../controllers/auth.controller').completeTelegramRegistration);
+router.post('/telegram/reset-request', require('../controllers/auth.controller').telegramResetPasswordRequest);
 
 export default router;
