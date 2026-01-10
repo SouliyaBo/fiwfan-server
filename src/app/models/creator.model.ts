@@ -6,6 +6,7 @@ export interface ICreator extends Document {
     bio?: string;
     bannerUrl?: string;
     location?: string;
+    country?: string;
     province?: string;
     zones?: string[];
     age?: number;
@@ -39,6 +40,7 @@ const CreatorSchema: Schema = new Schema({
     bio: { type: String },
     bannerUrl: { type: String },
     location: { type: String },
+    country: { type: String, default: 'Thailand' }, // Default for migration
     province: { type: String },
     zones: { type: [String] },
     age: { type: Number },

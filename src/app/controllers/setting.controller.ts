@@ -1,11 +1,22 @@
 import { Request, Response } from 'express';
 import Setting from '../models/setting.model';
 
-import { LOCATIONS } from '../data/locations';
+import { LOCATIONS_FLAT, COUNTRIES } from '../data/locations';
 
 // Get available locations
 export const getLocations = async (req: Request, res: Response) => {
-    res.json(LOCATIONS);
+    const { country } = req.query;
+
+    // If country code is provided, return provinces for that country
+    if (country) {
+        const selectedCountry = COUNTRIES.find(c => c.code === (country as string).toUpperCase());
+        return res.json(selectedCountry ? selectedCountry.provinces : []);
+    }
+
+    // Default: Return list of countries with their data
+    // Or if you want to maintain backward compatibility for a while, you could return flat list if no param?
+    // But for this feature, let's return the full hierarchy structure or just countries list
+    res.json(COUNTRIES);
 };
 
 // Get all settings (or specific one by query)
