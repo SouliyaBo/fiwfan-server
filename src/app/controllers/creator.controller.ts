@@ -8,6 +8,15 @@ export const getCreators = async (req: any, res: Response) => {
         const { location, usePreferences, name, lineId, gender, province, ageMin, ageMax, heightMin, heightMax, weightMin, weightMax, chestMin, chestMax, waistMin, waistMax, hipsMin, hipsMax } = req.query;
         let query: any = { isVerified: true };
 
+        // Get users with ACTIVE subscription
+        const activeSubs = await Subscription.find({
+            status: SubscriptionStatus.ACTIVE,
+            endDate: { $gt: new Date() }
+        }).distinct('user');
+
+        // Filter creators by active subscription
+        query.user = { $in: activeSubs };
+
         // Apply Preferences if user is logged in and requested it
         if (usePreferences === 'true' && req.user) {
             const user = await User.findById(req.user.id);
@@ -106,23 +115,39 @@ export const getCreators = async (req: any, res: Response) => {
 
 export const getZoneStats = async (req: Request, res: Response) => {
     try {
+        // 1. Get User IDs with ACTIVE subscriptions that haven't expired
+        const activeSubs = await Subscription.find({
+            status: SubscriptionStatus.ACTIVE,
+            endDate: { $gt: new Date() }
+        }).distinct('user');
+
+        // 2. Aggregate Creators who match those User IDs
         const stats = await Creator.aggregate([
+            {
+                $match: {
+                    user: { $in: activeSubs },
+                    isVerified: true
+                    // You might want to filter isHot, etc. if needed, but zones usually cover all verified active creators
+                }
+            },
             {
                 $project: {
                     // Combine zones array and location string into a single set of tags
-                    // wrapping location in [] to make it compatible with setUnion
+                    zones: { $ifNull: ["$zones", []] },
+                    location: { $ifNull: ["$location", null] }
+                }
+            },
+            {
+                $project: {
                     tags: {
-                        $setUnion: [
-                            { $ifNull: ["$zones", []] },
-                            [{ $ifNull: ["$location", null] }]
-                        ]
+                        $setUnion: ["$zones", [{ $ifNull: ["$location", ""] }]] // Combine unique values
                     }
                 }
             },
             { $unwind: "$tags" },
             {
                 $match: {
-                    tags: { $ne: null, $nin: ["", null] }
+                    tags: { $nin: ["", null] } // Filter out empty strings or nulls
                 }
             },
             {
@@ -140,6 +165,7 @@ export const getZoneStats = async (req: Request, res: Response) => {
                 }
             }
         ]);
+
         res.json(stats);
     } catch (error: any) {
         res.status(500).json({ message: error.message });
