@@ -127,40 +127,44 @@ export const getZoneStats = async (req: Request, res: Response) => {
                 $match: {
                     user: { $in: activeSubs },
                     isVerified: true
-                    // You might want to filter isHot, etc. if needed, but zones usually cover all verified active creators
                 }
             },
             {
                 $project: {
-                    // Combine zones array and location string into a single set of tags
                     zones: { $ifNull: ["$zones", []] },
-                    location: { $ifNull: ["$location", null] }
+                    location: { $ifNull: ["$location", null] },
+                    country: { $ifNull: ["$country", "Thailand"] } // Default to Thailand
                 }
             },
             {
                 $project: {
+                    country: 1,
                     tags: {
-                        $setUnion: ["$zones", [{ $ifNull: ["$location", ""] }]] // Combine unique values
+                        $setUnion: ["$zones", [{ $ifNull: ["$location", ""] }]]
                     }
                 }
             },
             { $unwind: "$tags" },
             {
                 $match: {
-                    tags: { $nin: ["", null] } // Filter out empty strings or nulls
+                    tags: { $nin: ["", null] }
                 }
             },
             {
                 $group: {
-                    _id: "$tags",
+                    _id: {
+                        country: "$country",
+                        name: "$tags"
+                    },
                     count: { $sum: 1 }
                 }
             },
-            { $sort: { count: -1 } },
+            { $sort: { "_id.country": 1, count: -1 } },
             {
                 $project: {
                     _id: 0,
-                    name: "$_id",
+                    country: "$_id.country",
+                    name: "$_id.name",
                     count: 1
                 }
             }
