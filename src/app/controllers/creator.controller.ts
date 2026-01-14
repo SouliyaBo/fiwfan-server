@@ -5,7 +5,7 @@ import Subscription, { SubscriptionStatus } from '../models/subscription.model';
 
 export const getCreators = async (req: any, res: Response) => {
     try {
-        const { location, usePreferences, name, lineId, gender, province, ageMin, ageMax, heightMin, heightMax, weightMin, weightMax, chestMin, chestMax, waistMin, waistMax, hipsMin, hipsMax } = req.query;
+        const { location, usePreferences, name, lineId, gender, province, country, ageMin, ageMax, heightMin, heightMax, weightMin, weightMax, chestMin, chestMax, waistMin, waistMax, hipsMin, hipsMax } = req.query;
         let query: any = { isVerified: true };
 
         // Get users with ACTIVE subscription
@@ -41,6 +41,17 @@ export const getCreators = async (req: any, res: Response) => {
         // For simplicity, direct query params will overwrite/set the field.
 
         if (gender) query.gender = gender;
+        if (country) {
+            if (country === 'Thailand') {
+                query.$or = [
+                    { country: 'Thailand' },
+                    { country: { $exists: false } },
+                    { country: null }
+                ];
+            } else {
+                query.country = country;
+            }
+        }
         if (province) query.province = province;
         if (name) query.displayName = { $regex: name as string, $options: 'i' };
         if (lineId) query.lineId = { $regex: lineId as string, $options: 'i' };
@@ -106,7 +117,9 @@ export const getCreators = async (req: any, res: Response) => {
             }
         }
 
-        const creators = await Creator.find(query).populate('user', 'username email avatarUrl');
+        const creators = await Creator.find(query)
+            .populate('user', 'username email avatarUrl')
+            .sort({ rankingPriority: -1, isVerified: -1, updatedAt: -1 });
         res.json(creators);
     } catch (error: any) {
         res.status(500).json({ message: error.message });
@@ -181,22 +194,44 @@ export const getCreatorById = async (req: Request, res: Response) => {
     try {
         const { id } = req.params;
 
-        // Try finding by Creator ID first, then by User ID
-        let creator = await Creator.findById(id).populate('user', 'username email avatarUrl').populate('posts');
+        // 1. Try finding by valid ObjectId (Creator ID)
+        let creator = null;
+        const mongoose = await import('mongoose');
 
+        if (mongoose.Types.ObjectId.isValid(id)) {
+            creator = await Creator.findById(id).populate('user', 'username email avatarUrl').populate('posts');
+            if (!creator) {
+                // 2. Try User ID if valid ObjectId
+                creator = await Creator.findOne({ user: id }).populate('user', 'username email avatarUrl').populate('posts');
+            }
+        }
+
+        // 3. Fallback: Search by username (if ID is not ObjectId, or not found yet)
         if (!creator) {
-            // If not found by Creator ID, try finding by User ID
-            creator = await Creator.findOne({ user: id }).populate('user', 'username email avatarUrl').populate('posts');
+            // Find user by username first
+            const User = (await import('../models/user.model')).default;
+            const user = await User.findOne({ username: id });
+            if (user) {
+                creator = await Creator.findOne({ user: user._id }).populate('user', 'username email avatarUrl').populate('posts');
+            }
+        }
+
+        // 4. Fallback: Search by exact displayName matches (if still not found)
+        if (!creator) {
+            creator = await Creator.findOne({ displayName: id }).populate('user', 'username email avatarUrl').populate('posts');
         }
 
         if (!creator) return res.status(404).json({ message: 'Creator not found' });
 
         // Fetch active subscription for this creator's user
-        const activeSubscription = await Subscription.findOne({
-            user: creator.user,
-            status: SubscriptionStatus.ACTIVE,
-            endDate: { $gt: new Date() }
-        }).select('planType status endDate');
+        let activeSubscription = null;
+        if (creator.user) {
+            activeSubscription = await Subscription.findOne({
+                user: creator.user._id || creator.user, // Handle both populated doc and ID
+                status: SubscriptionStatus.ACTIVE,
+                endDate: { $gt: new Date() }
+            }).select('planType status endDate');
+        }
 
         // Fetch reviews for this creator
         // Dynamic import to avoid circular dependency if any, though imports up top are fine
@@ -212,13 +247,7 @@ export const getCreatorById = async (req: Request, res: Response) => {
 
         res.json(creatorData);
     } catch (error: any) {
-        // Fallback for invalid ObjectIds
-        try {
-            // If id is valid objectId but not creator, try user
-            const creatorByUser = await Creator.findOne({ user: req.params.id }).populate('user', 'username email avatarUrl');
-            if (creatorByUser) return res.json(creatorByUser);
-        } catch (e) { }
-
+        console.error("Error in getCreatorById:", error);
         res.status(500).json({ message: error.message });
     }
 };

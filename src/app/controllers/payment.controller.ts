@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import Subscription, { PlanType, SubscriptionStatus } from '../models/subscription.model';
 import User from '../models/user.model';
+import Creator from '../models/creator.model';
 
 // --- Admin Controllers ---
 
@@ -55,7 +56,18 @@ export const approveSubscription = async (req: any, res: Response) => {
         subscription.endDate = newEndDate;
         await subscription.save();
 
-        res.json({ message: 'Subscription approved', subscription });
+        // 4. Update Creator Ranking Priority based on Plan
+        let priority = 0;
+        if (subscription.planType === 'SUPER_STAR') priority = 100;
+        else if (subscription.planType === 'STAR') priority = 50;
+        else if (subscription.planType === 'POPULAR') priority = 10;
+
+        await Creator.findOneAndUpdate(
+            { user: subscription.user },
+            { $set: { rankingPriority: priority } }
+        );
+
+        res.json({ message: 'Subscription approved and ranking updated', subscription });
     } catch (error: any) {
         res.status(500).json({ message: error.message });
     }

@@ -20,6 +20,7 @@ export interface IUser extends Document {
     updatedAt: Date;
     // Profile Fields
     age?: number;
+    country?: string;
     gender?: string;
     province?: string;
     location?: string;
@@ -59,6 +60,7 @@ const UserSchema: Schema = new Schema({
     resetPasswordExpires: { type: Date, select: false },
     // Profile Fields for User/Tourist
     age: { type: Number },
+    country: { type: String, default: 'Thailand' },
     gender: { type: String },
     province: { type: String },
     location: { type: String },

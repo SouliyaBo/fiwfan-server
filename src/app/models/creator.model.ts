@@ -21,6 +21,7 @@ export interface ICreator extends Document {
     views: number;
     isVerified: boolean;
     isHot: boolean;
+    rankingPriority: number;
     whatsapp?: string;
     agency?: mongoose.Types.ObjectId;
     agencyJoinStatus: 'NONE' | 'PENDING' | 'APPROVED';
@@ -71,6 +72,7 @@ const CreatorSchema: Schema = new Schema({
     views: { type: Number, default: 0 },
     isVerified: { type: Boolean, default: false },
     isHot: { type: Boolean, default: false },
+    rankingPriority: { type: Number, default: 0 },
     images: [{ type: String }],
     agency: { type: mongoose.Schema.Types.ObjectId, ref: 'Agency' },
     agencyJoinStatus: {

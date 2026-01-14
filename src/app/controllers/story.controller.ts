@@ -18,6 +18,16 @@ export const createStory = async (req: Request, res: Response) => {
 
         if (!mediaUrl) return res.status(400).json({ message: 'Media URL is required' });
 
+        // Check Video Permissions (Super Star Only)
+        if (mediaType === 'video') {
+            if (creator.rankingPriority < 100) {
+                return res.status(403).json({
+                    message: 'Video upload is restricted to Super Star plan only',
+                    code: 'PLAN_RESTRICTED'
+                });
+            }
+        }
+
         const newStory = new Story({
             creator: creator._id,
             mediaUrl,
