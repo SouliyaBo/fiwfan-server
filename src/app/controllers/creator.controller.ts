@@ -198,7 +198,7 @@ export const getCreatorById = async (req: Request, res: Response) => {
         let creator = null;
         const mongoose = await import('mongoose');
 
-        if (mongoose.Types.ObjectId.isValid(id)) {
+        if (mongoose.Types.ObjectId.isValid(id as string)) {
             creator = await Creator.findById(id).populate('user', 'username email avatarUrl').populate('posts');
             if (!creator) {
                 // 2. Try User ID if valid ObjectId
