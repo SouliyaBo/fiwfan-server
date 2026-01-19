@@ -317,7 +317,7 @@ export const getRecommendedCreators = async (req: Request, res: Response) => {
             {
                 $match: {
                     user: { $in: activeSubs }, // Only creators with active sub
-                    ...(excludeId ? { _id: { $ne: new (await import('mongoose')).Types.ObjectId(excludeId as string) } } : {})
+                    ...(excludeId && typeof excludeId === 'string' ? { _id: { $ne: new (await import('mongoose')).Types.ObjectId(excludeId) } } : {})
                 }
             },
             { $sample: { size: 4 } }
@@ -357,12 +357,86 @@ export const updateCreatorVerification = async (req: Request | any, res: Respons
         }
 
         const { id } = req.params;
-        const { isVerified } = req.body;
+        const { isVerified, verificationStatus, rejectionReason } = req.body;
 
-        const creator = await Creator.findByIdAndUpdate(id, { isVerified }, { new: true });
+        const updateData: any = {};
+        if (typeof isVerified === 'boolean') updateData.isVerified = isVerified;
+        if (verificationStatus) {
+            updateData.verificationStatus = verificationStatus;
+            // Clear verification data if verified? Or keep history?
+            // If rejected, maybe save reason
+            if (verificationStatus === 'REJECTED' && rejectionReason) {
+                if (!updateData.verificationData) updateData.verificationData = {};
+                updateData.verificationData.rejectionReason = rejectionReason;
+            }
+        }
+
+        // Setup nested update for rejection reason if needed, but simple merge is safer for now
+        // Let's use $set for flexibility if we were using raw mongo commands, but mongoose findByIdAndUpdate with partial object is fine.
+        // Actually, verificationData is a nested object.
+        let creator;
+        if (verificationStatus === 'REJECTED' && rejectionReason) {
+            creator = await Creator.findByIdAndUpdate(id, {
+                ...updateData,
+                $set: { "verificationData.rejectionReason": rejectionReason }
+            }, { new: true });
+        } else {
+            creator = await Creator.findByIdAndUpdate(id, updateData, { new: true });
+        }
         if (!creator) return res.status(404).json({ message: 'Creator not found' });
 
         res.json(creator);
+    } catch (error: any) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+export const submitKyc = async (req: any, res: Response) => {
+    try {
+        const userId = req.user.id;
+        const { photoWithCodeUrl, fullBodyPhotoUrl } = req.body;
+
+        if (!photoWithCodeUrl || !fullBodyPhotoUrl) {
+            return res.status(400).json({ message: 'Both photos are required' });
+        }
+
+        const creator = await Creator.findOne({ user: userId });
+        if (!creator) {
+            return res.status(404).json({ message: 'Creator not found' });
+        }
+
+        creator.verificationStatus = 'PENDING';
+        creator.verificationData = {
+            photoWithCodeUrl,
+            fullBodyPhotoUrl,
+            submittedAt: new Date()
+        };
+
+        await creator.save();
+
+        res.json({ message: 'KYC submitted successfully', verificationStatus: creator.verificationStatus });
+    } catch (error: any) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+export const getKycStatus = async (req: any, res: Response) => {
+    try {
+        const userId = req.user.id;
+        const creator = await Creator.findOne({ user: userId });
+
+        if (!creator) {
+            return res.status(404).json({ message: 'Creator not found' });
+        }
+
+        // Generate a stateless verification code based on user ID
+        const verificationCode = `PHUSAO-${userId.toString().slice(-6).toUpperCase()}`;
+
+        res.json({
+            verificationStatus: creator.verificationStatus,
+            verificationData: creator.verificationData,
+            verificationCode
+        });
     } catch (error: any) {
         res.status(500).json({ message: error.message });
     }

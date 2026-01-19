@@ -189,7 +189,7 @@ export const getUsers = async (req: Request | any, res: Response) => {
             const userObj = u.toObject();
             if (u.role === 'CREATOR') {
                 const Creator = (await import('../models/creator.model')).default;
-                const creator = await Creator.findOne({ user: u._id }).select('isVerified _id');
+                const creator = await Creator.findOne({ user: u._id }).select('isVerified _id verificationStatus verificationData');
                 if (creator) {
                     userObj.creatorProfile = creator;
                 }
