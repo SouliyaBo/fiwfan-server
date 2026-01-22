@@ -120,7 +120,39 @@ export const getCreators = async (req: any, res: Response) => {
         const creators = await Creator.find(query)
             .populate('user', 'username email avatarUrl')
             .sort({ rankingPriority: -1, isVerified: -1, updatedAt: -1 });
-        res.json(creators);
+
+        // Enrich with Plan Name and Review Count
+        const creatorUserIds = creators.map(c => (c.user as any)._id);
+        const creatorIds = creators.map(c => c._id);
+
+        const subscriptions = await Subscription.find({
+            user: { $in: creatorUserIds },
+            status: SubscriptionStatus.ACTIVE,
+            endDate: { $gt: new Date() }
+        });
+
+        // Aggregate Review Counts
+        const Review = (await import('../models/review.model')).default;
+        const reviewCounts = await Review.aggregate([
+            { $match: { creator: { $in: creatorIds } } },
+            { $group: { _id: "$creator", count: { $sum: 1 } } }
+        ]);
+
+        const creatorsWithPlan = creators.map(c => {
+            const sub = subscriptions.find(s => s.user.toString() === (c.user as any)._id.toString());
+            const planName = sub?.planType || "";
+
+            const reviewCountObj = reviewCounts.find(r => r._id.toString() === c._id.toString());
+            const reviewCount = reviewCountObj ? reviewCountObj.count : 0;
+
+            return {
+                ...c.toObject(),
+                planName,
+                reviewCount
+            };
+        });
+
+        res.json(creatorsWithPlan);
     } catch (error: any) {
         res.status(500).json({ message: error.message });
     }
