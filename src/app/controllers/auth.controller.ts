@@ -5,6 +5,7 @@ import Agency from '../models/agency.model';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
+import { sendVerificationEmail } from '../../utils/email';
 
 export const forgotPassword = async (req: Request, res: Response) => {
     try {
@@ -27,13 +28,15 @@ export const forgotPassword = async (req: Request, res: Response) => {
 
         // In a real app, send email here.
         // For this demo/dev, return the token so frontend can use it.
-        // Construct the reset URL (frontend route)
-        const resetUrl = `http://localhost:3000/auth?mode=reset&token=${resetToken}`;
+        // Construct the reset URL dynamically
+        const frontendUrl = process.env.FRONTEND_URL || req.get('origin') || 'http://localhost:3000';
+        const resetUrl = `${frontendUrl}/auth?mode=reset&token=${resetToken}`;
 
         res.status(200).json({
             success: true,
-            data: "Email sent (simulated)",
-            browsingUrl: resetUrl // Frontend needs the RAW token, not the hashed one
+            message: "Email sent (simulated)",
+            resetLink: resetUrl, // Frontend needs this to display in dev mode
+            browsingUrl: resetUrl // Legacy support if needed
         });
 
     } catch (error: any) {
@@ -74,6 +77,7 @@ export const resetPassword = async (req: Request, res: Response) => {
     }
 };
 
+
 export const register = async (req: Request, res: Response) => {
     try {
         const { email, password, role, username, creatorType } = req.body;
@@ -89,12 +93,17 @@ export const register = async (req: Request, res: Response) => {
             finalRole = Role.AGENCY;
         }
 
+        // Generate Verification Token
+        const verificationToken = crypto.randomBytes(32).toString('hex');
+
         const newUser = new User({
             email,
             password: hashedPassword,
             username: username || email.split('@')[0],
             role: finalRole,
-            isCreator: finalRole === Role.CREATOR // Only true models are 'isCreator'
+            isCreator: finalRole === Role.CREATOR, // Only true models are 'isCreator'
+            isVerified: false, // Wait for email verification
+            verificationToken: verificationToken
         });
 
         await newUser.save();
@@ -116,13 +125,52 @@ export const register = async (req: Request, res: Response) => {
             await newAgency.save();
         }
 
-        const token = jwt.sign({ id: newUser._id, role: newUser.role }, process.env.JWT_SECRET || 'secret', { expiresIn: '1d' });
+        // Send Verification Email
+        try {
+            await sendVerificationEmail(newUser.email, verificationToken);
+        } catch (emailError) {
+            console.error("Failed to send verification email:", emailError);
+            // Consider rolling back user creation or just warning? 
+            // For now, proceed but client should know email might not arrive if config is bad.
+        }
 
+        // DO NOT return token/auto-login. 
         res.status(201).json({
-            message: 'User registered successfully',
-            token,
-            user: { id: newUser._id, username: newUser.username, role: newUser.role }
+            message: 'Registration successful. Please check your email to verify your account.',
+            verifyRequired: true,
+            email: newUser.email
         });
+    } catch (error: any) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+export const verifyEmail = async (req: Request, res: Response) => {
+    try {
+        const { token } = req.body;
+
+        if (!token) {
+            return res.status(400).json({ message: 'Verification token is required' });
+        }
+
+        const user = await User.findOne({ verificationToken: token });
+
+        if (!user) {
+            return res.status(400).json({ message: 'Invalid or expired verification token' });
+        }
+
+        user.isVerified = true;
+        user.verificationToken = undefined; // Clear token
+        await user.save();
+
+        // Optional: Auto-login after verification? 
+        // Or just tell them to login. Let's just return success first.
+
+        res.status(200).json({
+            message: 'Email verified successfully. You can now login.',
+            success: true
+        });
+
     } catch (error: any) {
         res.status(500).json({ message: error.message });
     }

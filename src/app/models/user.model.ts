@@ -14,7 +14,6 @@ export interface IUser extends Document {
     displayName?: string;
     avatarUrl?: string;
     role: Role;
-    lineId?: string;
     isCreator: boolean;
     createdAt: Date;
     updatedAt: Date;
@@ -43,6 +42,9 @@ export interface IUser extends Document {
         serviceTypes: string[];
         serviceTags: string[];
     };
+    // Verification
+    isVerified: boolean;
+    verificationToken?: string;
     resetPasswordToken?: string;
     resetPasswordExpires?: Date;
 }
@@ -56,6 +58,11 @@ const UserSchema: Schema = new Schema({
     role: { type: String, enum: Object.values(Role), default: Role.USER },
     lineId: { type: String },
     isCreator: { type: Boolean, default: false },
+
+    // Verification
+    isVerified: { type: Boolean, default: false },
+    verificationToken: { type: String, select: false },
+
     resetPasswordToken: { type: String, select: false },
     resetPasswordExpires: { type: Date, select: false },
     // Profile Fields for User/Tourist
