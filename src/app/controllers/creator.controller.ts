@@ -2,20 +2,29 @@ import { Request, Response } from 'express';
 import Creator from '../models/creator.model';
 import User from '../models/user.model';
 import Subscription, { SubscriptionStatus } from '../models/subscription.model';
+import Setting from '../models/setting.model';
 
 export const getCreators = async (req: any, res: Response) => {
     try {
         const { location, usePreferences, name, lineId, gender, province, country, ageMin, ageMax, heightMin, heightMax, weightMin, weightMax, chestMin, chestMax, waistMin, waistMax, hipsMin, hipsMax } = req.query;
         let query: any = { isVerified: true };
 
-        // Get users with ACTIVE subscription
-        const activeSubs = await Subscription.find({
-            status: SubscriptionStatus.ACTIVE,
-            endDate: { $gt: new Date() }
-        }).distinct('user');
+        // Check Free Mode
+        const freeModeSetting = await Setting.findOne({ key: 'isFreeMode' });
+        const isFreeMode = freeModeSetting?.value === 'true';
 
-        // Filter creators by active subscription
-        query.user = { $in: activeSubs };
+        // Get users with ACTIVE subscription IF NOT in Free Mode
+        let activeSubs: any[] = [];
+        if (!isFreeMode) {
+            activeSubs = await Subscription.find({
+                status: SubscriptionStatus.ACTIVE,
+                endDate: { $gt: new Date() }
+            }).distinct('user');
+
+            // Filter creators by active subscription
+            query.user = { $in: activeSubs };
+        }
+
 
         // Apply Preferences if user is logged in and requested it
         if (usePreferences === 'true' && req.user) {
@@ -140,7 +149,7 @@ export const getCreators = async (req: any, res: Response) => {
 
         const creatorsWithPlan = creators.map(c => {
             const sub = subscriptions.find(s => s.user.toString() === (c.user as any)._id.toString());
-            const planName = sub?.planType || "";
+            const planName = isFreeMode ? (sub?.planType || "Free Mode") : (sub?.planType || "");
 
             const reviewCountObj = reviewCounts.find(r => r._id.toString() === c._id.toString());
             const reviewCount = reviewCountObj ? reviewCountObj.count : 0;
@@ -160,19 +169,26 @@ export const getCreators = async (req: any, res: Response) => {
 
 export const getZoneStats = async (req: Request, res: Response) => {
     try {
-        // 1. Get User IDs with ACTIVE subscriptions that haven't expired
-        const activeSubs = await Subscription.find({
-            status: SubscriptionStatus.ACTIVE,
-            endDate: { $gt: new Date() }
-        }).distinct('user');
+        // Check Free Mode
+        const freeModeSetting = await Setting.findOne({ key: 'isFreeMode' });
+        const isFreeMode = freeModeSetting?.value === 'true';
+
+        let activeSubs: any[] = [];
+        let matchQuery: any = { isVerified: true };
+
+        if (!isFreeMode) {
+            // 1. Get User IDs with ACTIVE subscriptions that haven't expired
+            activeSubs = await Subscription.find({
+                status: SubscriptionStatus.ACTIVE,
+                endDate: { $gt: new Date() }
+            }).distinct('user');
+            matchQuery.user = { $in: activeSubs };
+        }
 
         // 2. Aggregate Creators who match those User IDs
         const stats = await Creator.aggregate([
             {
-                $match: {
-                    user: { $in: activeSubs },
-                    isVerified: true
-                }
+                $match: matchQuery
             },
             {
                 $project: {
@@ -289,8 +305,12 @@ export const updateCreatorProfile = async (req: any, res: Response) => {
         const userId = req.user.id;
         const updates = req.body;
 
+        // Check Free Mode
+        const freeModeSetting = await Setting.findOne({ key: 'isFreeMode' });
+        const isFreeMode = freeModeSetting?.value === 'true';
+
         // Check Subscription if updating images (Gallery)
-        if (updates.images && updates.images.length > 0) {
+        if (updates.images && updates.images.length > 0 && !isFreeMode) {
             const activeSubscription = await Subscription.findOne({
                 user: userId,
                 status: SubscriptionStatus.ACTIVE,
@@ -338,22 +358,35 @@ export const getRecommendedCreators = async (req: Request, res: Response) => {
     try {
         const { excludeId } = req.query;
 
-        // 1. Get users with ACTIVE subscription
-        const activeSubs = await Subscription.find({
-            status: SubscriptionStatus.ACTIVE,
-            endDate: { $gt: new Date() }
-        }).distinct('user'); // Get distinct user IDs
+        // Check Free Mode
+        const freeModeSetting = await Setting.findOne({ key: 'isFreeMode' });
+        const isFreeMode = freeModeSetting?.value === 'true';
+
+        // 1. Get users with ACTIVE subscription IF NOT in Free Mode
+        let activeSubs: any[] = [];
+        if (!isFreeMode) {
+            activeSubs = await Subscription.find({
+                status: SubscriptionStatus.ACTIVE,
+                endDate: { $gt: new Date() }
+            }).distinct('user'); // Get distinct user IDs
+        }
 
         // 2. Build Aggregation
-        const pipeline: any[] = [
-            {
-                $match: {
-                    user: { $in: activeSubs }, // Only creators with active sub
-                    ...(excludeId && typeof excludeId === 'string' ? { _id: { $ne: new (await import('mongoose')).Types.ObjectId(excludeId) } } : {})
-                }
-            },
-            { $sample: { size: 4 } }
-        ];
+        const pipeline: any[] = [];
+
+        const matchStage: any = {};
+        if (!isFreeMode) {
+            matchStage.user = { $in: activeSubs };
+        }
+        if (excludeId && typeof excludeId === 'string') {
+            matchStage._id = { $ne: new (await import('mongoose')).Types.ObjectId(excludeId) };
+        }
+
+        if (Object.keys(matchStage).length > 0) {
+            pipeline.push({ $match: matchStage });
+        }
+
+        pipeline.push({ $sample: { size: 4 } });
 
         const recommended = await Creator.aggregate(pipeline);
 

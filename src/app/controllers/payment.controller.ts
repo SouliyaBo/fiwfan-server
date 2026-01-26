@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import Subscription, { PlanType, SubscriptionStatus } from '../models/subscription.model';
 import User from '../models/user.model';
 import Creator from '../models/creator.model';
+import Plan from '../models/plan.model';
 
 // --- Admin Controllers ---
 
@@ -57,10 +58,18 @@ export const approveSubscription = async (req: any, res: Response) => {
         await subscription.save();
 
         // 4. Update Creator Ranking Priority based on Plan
+        // Fetch priority from Plan model
+        const plan = await Plan.findOne({ id: subscription.planType });
         let priority = 0;
-        if (subscription.planType === 'SUPER_STAR') priority = 100;
-        else if (subscription.planType === 'STAR') priority = 50;
-        else if (subscription.planType === 'POPULAR') priority = 10;
+
+        if (plan) {
+            priority = plan.rankingPriority;
+        } else {
+            // Fallback for legacy hardcoded values if plan not found in DB
+            if (subscription.planType === 'SUPER_STAR') priority = 100;
+            else if (subscription.planType === 'STAR') priority = 50;
+            else if (subscription.planType === 'POPULAR') priority = 10;
+        }
 
         await Creator.findOneAndUpdate(
             { user: subscription.user },
@@ -91,48 +100,13 @@ export const rejectSubscription = async (req: any, res: Response) => {
     }
 };
 
-// Mock Plans Data
-const PLANS = [
-    {
-        id: 'SUPER_STAR',
-        name: 'SUPER STAR',
-        description: 'Boost visibility 300%',
-        features: ['แสดงรายชื่อเป็นอันดับ 1 (บนสุด)', 'ผลการค้นหา: อันดับ 1', 'มีวิดีโอ / รีลแนะนำ', 'การมองเห็นเพิ่มขึ้น 300%'],
-        prices: [
-            { duration: '1 Week', price: 1293, days: 7 },
-            { duration: '2 Weeks', price: 2423, days: 14 },
-            { duration: '4 Weeks', price: 4524, days: 28 }
-        ],
-        theme: 'gold'
-    },
-    {
-        id: 'STAR',
-        name: 'STAR',
-        description: 'Boost visibility 100%',
-        features: ['แสดงรายชื่อเป็นอันดับ 2', 'ผลการค้นหา: อันดับ 2'],
-        prices: [
-            { duration: '1 Week', price: 808, days: 7 },
-            { duration: '2 Weeks', price: 1518, days: 14 },
-            { duration: '4 Weeks', price: 2844, days: 28 }
-        ],
-        theme: 'blue'
-    },
-    {
-        id: 'POPULAR',
-        name: 'POPULAR',
-        description: 'Normal visibility',
-        features: ['แสดงรายชื่อเป็นอันดับ 3', 'ผลการค้นหา: อันดับ 3'],
-        prices: [
-            { duration: '1 Week', price: 486, days: 7 },
-            { duration: '2 Weeks', price: 872, days: 14 },
-            { duration: '4 Weeks', price: 1646, days: 28 }
-        ],
-        theme: 'teal'
+export const getPlans = async (req: Request, res: Response) => {
+    try {
+        const plans = await Plan.find({ isActive: true }).sort({ rankingPriority: -1 });
+        res.json(plans);
+    } catch (error: any) {
+        res.status(500).json({ message: error.message });
     }
-];
-
-export const getPlans = (req: Request, res: Response) => {
-    res.json(PLANS);
 };
 
 export const subscribe = async (req: any, res: Response) => {
@@ -147,6 +121,12 @@ export const subscribe = async (req: any, res: Response) => {
         // 1. Verify slipUrl is provided
         if (!slipUrl) {
             return res.status(400).json({ message: 'Slip URL is required' });
+        }
+
+        // Verify Plan exists (Optional but recommended)
+        const plan = await Plan.findOne({ id: planId });
+        if (!plan) {
+            return res.status(400).json({ message: 'Invalid Plan ID' });
         }
 
         console.log(`Processing subscription request for user ${userId}: ${price} THB for ${planId}`);

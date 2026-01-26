@@ -39,6 +39,8 @@ import storyRoutes from './app/routes/story.routes';
 app.use('/stories', storyRoutes);
 import reportRoutes from './app/routes/report.routes';
 app.use('/reports', reportRoutes);
+import planRoutes from './app/routes/plan.routes';
+app.use('/plans', planRoutes);
 
 // Post Routes
 import { createPost } from './app/controllers/post.controller';
