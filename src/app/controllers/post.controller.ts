@@ -17,10 +17,27 @@ export const createPost = async (req: any, res: any) => {
         });
 
         if (!activeSubscription) {
-            return res.status(403).json({
-                error: 'Subscription required',
-                code: 'SUBSCRIPTION_REQUIRED'
-            });
+            // Check Free Mode and KYC
+            const Setting = (await import('../models/setting.model')).default;
+            const freeModeSetting = await Setting.findOne({ key: 'isFreeMode' });
+            const isFreeMode = freeModeSetting?.value === 'true';
+
+            if (!isFreeMode) {
+                return res.status(403).json({
+                    error: 'Subscription required',
+                    code: 'SUBSCRIPTION_REQUIRED'
+                });
+            }
+
+            // Free Mode is ON, check KYC
+            const creatorCheck = await Creator.findOne({ user: userId });
+            if (!creatorCheck || creatorCheck.verificationStatus !== 'APPROVED') {
+                return res.status(403).json({
+                    error: 'KYC Verification required for Free Mode',
+                    code: 'KYC_REQUIRED'
+                });
+            }
+            // If KYC approved, allow proceed
         }
 
         const creator = await Creator.findOne({ user: userId });

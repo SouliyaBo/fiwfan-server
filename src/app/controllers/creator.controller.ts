@@ -323,6 +323,15 @@ export const updateCreatorProfile = async (req: any, res: Response) => {
                     code: 'SUBSCRIPTION_REQUIRED'
                 });
             }
+        } else if (updates.images && updates.images.length > 0 && isFreeMode) {
+            // Free Mode: Check KYC
+            const creatorCheck = await Creator.findOne({ user: userId });
+            if (!creatorCheck || creatorCheck.verificationStatus !== 'APPROVED') {
+                return res.status(403).json({
+                    error: 'KYC Verification required for Free Mode',
+                    code: 'KYC_REQUIRED'
+                });
+            }
         }
 
         // Logic check: If updating agency, set status to PENDING
