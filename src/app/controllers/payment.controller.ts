@@ -129,6 +129,16 @@ export const subscribe = async (req: any, res: Response) => {
             return res.status(400).json({ message: 'Invalid Plan ID' });
         }
 
+        // Check if user already has a pending subscription
+        const existingPending = await Subscription.findOne({
+            user: userId,
+            status: SubscriptionStatus.PENDING
+        });
+
+        if (existingPending) {
+            return res.status(400).json({ message: 'You already have a pending subscription request.' });
+        }
+
         console.log(`Processing subscription request for user ${userId}: ${price} THB for ${planId}`);
 
         // 2. Calculate dates
