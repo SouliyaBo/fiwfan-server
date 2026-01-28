@@ -15,6 +15,8 @@ const app = express();
 // Connect to Database
 connectDB();
 
+app.set('trust proxy', 1);
+
 // Middleware
 // Middleware
 app.use(cors({
