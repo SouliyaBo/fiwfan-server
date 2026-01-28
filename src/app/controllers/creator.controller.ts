@@ -126,9 +126,12 @@ export const getCreators = async (req: any, res: Response) => {
             }
         }
 
-        const creators = await Creator.find(query)
+        const allCreators = await Creator.find(query)
             .populate('user', 'username email avatarUrl')
             .sort({ rankingPriority: -1, isVerified: -1, updatedAt: -1 });
+
+        // Filter out creators whose user account might have been deleted (null user)
+        const creators = allCreators.filter(c => c.user);
 
         // Enrich with Plan Name and Review Count
         const creatorUserIds = creators.map(c => (c.user as any)._id);
@@ -404,7 +407,9 @@ export const getRecommendedCreators = async (req: Request, res: Response) => {
 
         // 4. Attach Active Subscription Object (needed for frontend logic)
         // Since we filtered by activeSubs, we know they have one, but we need the details (planType etc)
-        const result = await Promise.all(populatedRecommended.map(async (creator: any) => {
+        const result = (await Promise.all(populatedRecommended.map(async (creator: any) => {
+            if (!creator.user) return null;
+
             const sub = await Subscription.findOne({
                 user: creator.user._id || creator.user, // Handle populated or not
                 status: SubscriptionStatus.ACTIVE,
@@ -415,7 +420,7 @@ export const getRecommendedCreators = async (req: Request, res: Response) => {
                 ...creator,
                 activeSubscription: sub
             };
-        }));
+        }))).filter(Boolean);
 
         res.json(result);
 
