@@ -102,8 +102,8 @@ export const register = async (req: Request, res: Response) => {
             username: username || email.split('@')[0],
             role: finalRole,
             isCreator: finalRole === Role.CREATOR, // Only true models are 'isCreator'
-            isVerified: false, // Wait for email verification
-            verificationToken: verificationToken
+            isVerified: true, // TEMPORARY: Bypass email verification
+            // verificationToken: verificationToken // Not needed if bypassed
         });
 
         await newUser.save();
@@ -126,19 +126,30 @@ export const register = async (req: Request, res: Response) => {
         }
 
         // Send Verification Email
+        /* 
         try {
             await sendVerificationEmail(newUser.email, verificationToken);
         } catch (emailError) {
             console.error("Failed to send verification email:", emailError);
-            // Consider rolling back user creation or just warning? 
-            // For now, proceed but client should know email might not arrive if config is bad.
         }
+        */
 
-        // DO NOT return token/auto-login. 
+        // Return token for auto-login or just success
+        const token = jwt.sign({ id: newUser._id, role: newUser.role }, process.env.JWT_SECRET || 'secret', { expiresIn: '1d' });
+
         res.status(201).json({
-            message: 'Registration successful. Please check your email to verify your account.',
-            verifyRequired: true,
-            email: newUser.email
+            message: 'Registration successful.',
+            verifyRequired: false,
+            email: newUser.email,
+            token,
+            user: {
+                id: newUser._id,
+                username: newUser.username,
+                role: newUser.role,
+                avatarUrl: newUser.avatarUrl,
+                displayName: newUser.displayName,
+                email: newUser.email
+            }
         });
     } catch (error: any) {
         res.status(500).json({ message: error.message });
