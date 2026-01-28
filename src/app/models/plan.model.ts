@@ -7,7 +7,7 @@ export interface IStartPrice {
 }
 
 export interface IPlan extends Document {
-    id: string; // e.g., 'SUPER_STAR'
+    id: string; // 'SUPER_STAR'
     name: string;
     description: string;
     features: string[];
