@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import User from '../models/user.model';
 import Creator from '../models/creator.model';
+import Subscription, { SubscriptionStatus } from '../models/subscription.model';
 
 export const getProfile = async (req: Request | any, res: Response) => {
     try {
@@ -11,7 +12,19 @@ export const getProfile = async (req: Request | any, res: Response) => {
             return res.status(404).json({ message: 'User not found' });
         }
 
-        res.json(user);
+        // Find Active Subscription
+        const activeSub = await Subscription.findOne({
+            user: userId,
+            status: SubscriptionStatus.ACTIVE,
+            endDate: { $gt: new Date() }
+        }).sort({ endDate: -1 });
+
+        const userObj = user.toObject() as any;
+        if (activeSub) {
+            userObj.planId = activeSub.planType;
+        }
+
+        res.json(userObj);
     } catch (error: any) {
         res.status(500).json({ message: error.message });
     }

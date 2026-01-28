@@ -38,3 +38,17 @@ export const handleUpload = (req: any, res: any) => {
 
     res.json({ url });
 };
+
+export const handleMultipleUpload = (req: any, res: any) => {
+    if (!req.files || req.files.length === 0) {
+        return res.status(400).json({ error: 'No files uploaded' });
+    }
+
+    const urls = req.files.map((file: any) => {
+        const protocol = req.protocol;
+        const host = req.get('host');
+        return `${protocol}://${host}/uploads/${file.filename}`;
+    });
+
+    res.json({ urls });
+};

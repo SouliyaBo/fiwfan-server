@@ -17,7 +17,8 @@ const PLANS = [
             { duration: '4 Weeks', price: 4524, days: 28 }
         ],
         theme: 'gold',
-        rankingPriority: 100
+        rankingPriority: 100,
+        type: 'CREATOR'
     },
     {
         id: 'STAR',
@@ -30,7 +31,8 @@ const PLANS = [
             { duration: '4 Weeks', price: 2844, days: 28 }
         ],
         theme: 'blue',
-        rankingPriority: 50
+        rankingPriority: 50,
+        type: 'CREATOR'
     },
     {
         id: 'POPULAR',
@@ -43,7 +45,45 @@ const PLANS = [
             { duration: '4 Weeks', price: 1646, days: 28 }
         ],
         theme: 'teal',
-        rankingPriority: 10
+        rankingPriority: 10,
+        type: 'CREATOR'
+    },
+    // --- Tourist Plans ---
+    {
+        id: 'TOURIST_ONE_NIGHT',
+        name: 'One Night Stand',
+        description: 'Post for 24 Hours',
+        features: ['โพสต์หาคนดูแล 24 ชม.', 'แสดงผลใน Widget', 'ผู้ดูแลทักหาได้ทันที'],
+        prices: [
+            { duration: '24 Hours', price: 199, days: 1 }
+        ],
+        theme: 'gray',
+        rankingPriority: 0,
+        type: 'TOURIST'
+    },
+    {
+        id: 'TOURIST_WEEKEND',
+        name: 'Weekend Vibes',
+        description: 'Post for 3 Days',
+        features: ['โพสต์หาคนดูแล 3 วัน', 'แสดงผลนานขึ้น', 'ไฮไลท์โพสต์'],
+        prices: [
+            { duration: '3 Days', price: 499, days: 3 }
+        ],
+        theme: 'purple',
+        rankingPriority: 0,
+        type: 'TOURIST'
+    },
+    {
+        id: 'TOURIST_VVIP',
+        name: 'VVIP Party',
+        description: 'Post for 7 Days',
+        features: ['โพสต์หาคนดูแล 7 วัน', 'ปักหมุดโพสต์แนะนำ', 'ตราสัญลักษณ์ VVIP'],
+        prices: [
+            { duration: '7 Days', price: 999, days: 7 }
+        ],
+        theme: 'gold',
+        rankingPriority: 0,
+        type: 'TOURIST'
     }
 ];
 

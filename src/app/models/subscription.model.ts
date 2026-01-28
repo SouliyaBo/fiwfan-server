@@ -3,7 +3,10 @@ import mongoose, { Document, Schema } from 'mongoose';
 export enum PlanType {
     SUPER_STAR = 'SUPER_STAR',
     STAR = 'STAR',
-    POPULAR = 'POPULAR'
+    POPULAR = 'POPULAR',
+    TOURIST_ONE_NIGHT = 'TOURIST_ONE_NIGHT',
+    TOURIST_WEEKEND = 'TOURIST_WEEKEND',
+    TOURIST_VVIP = 'TOURIST_VVIP'
 }
 
 export enum SubscriptionStatus {

@@ -15,6 +15,7 @@ export interface IPlan extends Document {
     theme: string; // 'gold', 'blue', etc.
     isActive: boolean;
     rankingPriority: number; // For sorting creators 100, 50, 10
+    type: 'CREATOR' | 'TOURIST';
 }
 
 const PlanSchema: Schema = new Schema({
@@ -29,7 +30,8 @@ const PlanSchema: Schema = new Schema({
     }],
     theme: { type: String, default: 'blue' },
     isActive: { type: Boolean, default: true },
-    rankingPriority: { type: Number, default: 0 }
+    rankingPriority: { type: Number, default: 0 },
+    type: { type: String, enum: ['CREATOR', 'TOURIST'], default: 'CREATOR' }
 }, { timestamps: true });
 
 export default mongoose.model<IPlan>('Plan', PlanSchema);

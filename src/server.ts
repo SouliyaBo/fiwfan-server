@@ -41,6 +41,8 @@ import reportRoutes from './app/routes/report.routes';
 app.use('/reports', reportRoutes);
 import planRoutes from './app/routes/plan.routes';
 app.use('/plans', planRoutes);
+import jobRoutes from './app/routes/job.routes';
+app.use('/jobs', jobRoutes);
 
 // Post Routes
 import { createPost } from './app/controllers/post.controller';
@@ -48,8 +50,9 @@ import { authenticate } from './app/middleware/auth.middleware';
 app.post('/posts', authenticate, createPost);
 
 // Upload Routes
-import { upload, handleUpload } from './app/controllers/upload.controller';
+import { upload, handleUpload, handleMultipleUpload } from './app/controllers/upload.controller';
 app.post('/upload', upload.single('file'), handleUpload);
+app.post('/upload/multiple', upload.array('images', 10), handleMultipleUpload);
 app.use('/uploads', express.static('public/uploads'));
 
 app.get('/', (req, res) => {
