@@ -168,3 +168,20 @@ export const updateJob = async (req: any, res: Response) => {
         res.status(500).json({ message: error.message });
     }
 };
+
+export const deleteJob = async (req: any, res: Response) => {
+    try {
+        const userId = req.user.id;
+        const { id } = req.params;
+
+        const job = await Job.findOneAndDelete({ _id: id, user: userId });
+
+        if (!job) {
+            return res.status(404).json({ message: 'Job not found or you are not authorized to delete this job' });
+        }
+
+        res.json({ message: 'Job deleted successfully' });
+    } catch (error: any) {
+        res.status(500).json({ message: error.message });
+    }
+};

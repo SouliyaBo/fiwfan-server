@@ -12,7 +12,7 @@ const ses = new AWS.SES({
 
 export const sendEmail = async (to: string, subject: string, body: string) => {
     const params = {
-        Source: process.env.AWS_SENDER_EMAIL || 'noreply@fiwfans.win', // Replace with your verified sender email
+        Source: process.env.AWS_SENDER_EMAIL || 'noreply@phusao.com', // Replace with your verified sender email
         Destination: {
             ToAddresses: [to]
         },

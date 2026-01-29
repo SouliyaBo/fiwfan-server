@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { authenticate, optionalAuthenticate } from '../middleware/auth.middleware';
-import { createJob, getJobs, getMyJobs, updateJob } from '../controllers/job.controller';
+import { createJob, getJobs, getMyJobs, updateJob, deleteJob } from '../controllers/job.controller';
 
 const router = Router();
 
@@ -12,5 +12,6 @@ router.get('/', optionalAuthenticate, getJobs);
 router.post('/', authenticate, createJob);
 router.get('/me', authenticate, getMyJobs);
 router.put('/:id', authenticate, updateJob);
+router.delete('/:id', authenticate, deleteJob);
 
 export default router;
