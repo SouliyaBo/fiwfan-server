@@ -78,6 +78,7 @@ export const approveSubscription = async (req: any, res: Response) => {
 
         res.json({ message: 'Subscription approved and ranking updated', subscription });
     } catch (error: any) {
+        console.error('Subscription approval failed:', error);
         res.status(500).json({ message: error.message });
     }
 };
@@ -96,6 +97,7 @@ export const rejectSubscription = async (req: any, res: Response) => {
 
         res.json({ message: 'Subscription rejected', subscription });
     } catch (error: any) {
+        console.error('Subscription rejection failed:', error);
         res.status(500).json({ message: error.message });
     }
 };
@@ -162,6 +164,7 @@ export const subscribe = async (req: any, res: Response) => {
         res.status(201).json(subscription);
 
     } catch (error: any) {
+        console.error('Subscription creation failed:', error);
         res.status(500).json({ message: error.message });
     }
 };

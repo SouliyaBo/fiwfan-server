@@ -18,7 +18,7 @@ export enum SubscriptionStatus {
 
 export interface ISubscription extends Document {
     user: string; // User ID (Creator)
-    planType: PlanType;
+    planType: string;
     status: SubscriptionStatus;
     startDate: Date;
     endDate: Date;
@@ -33,7 +33,6 @@ const SubscriptionSchema: Schema = new Schema({
     user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     planType: {
         type: String,
-        enum: Object.values(PlanType),
         required: true
     },
     status: {
