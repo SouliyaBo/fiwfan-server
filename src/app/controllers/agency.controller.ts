@@ -25,7 +25,11 @@ export const getAgencyById = async (req: Request, res: Response) => {
     try {
         const agency = await Agency.findById(req.params.id).populate({
             path: 'creators',
-            match: { agencyJoinStatus: 'APPROVED' } // Only show approved creators
+            match: { agencyJoinStatus: 'APPROVED' }, // Only show approved creators
+            populate: {
+                path: 'user',
+                select: 'displayName avatarUrl'
+            }
         });
         if (!agency) return res.status(404).json({ message: 'Agency not found' });
         res.json(agency);
