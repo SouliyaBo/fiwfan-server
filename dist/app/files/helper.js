@@ -12,9 +12,9 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.deleteS3File = exports.getSignedImageUrl = void 0;
+exports.deleteS3File = exports.getSignedImageUrl = exports.s3 = void 0;
 const aws_sdk_1 = __importDefault(require("aws-sdk"));
-const s3 = new aws_sdk_1.default.S3({
+exports.s3 = new aws_sdk_1.default.S3({
     region: process.env.AWS_REGION,
     accessKeyId: process.env.AWS_ACCESS_KEY_ID,
     secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
@@ -23,7 +23,7 @@ const s3 = new aws_sdk_1.default.S3({
 const getSignedImageUrl = (bucket_1, fileName_1, fileType_1, ...args_1) => __awaiter(void 0, [bucket_1, fileName_1, fileType_1, ...args_1], void 0, function* (bucket, fileName, fileType, folder = "images") {
     try {
         const key = `${folder}/${fileName}`;
-        const uploadUrl = s3.getSignedUrl("putObject", {
+        const uploadUrl = exports.s3.getSignedUrl("putObject", {
             Bucket: bucket,
             Key: key,
             ContentType: fileType,
@@ -42,7 +42,7 @@ const getSignedImageUrl = (bucket_1, fileName_1, fileType_1, ...args_1) => __awa
 exports.getSignedImageUrl = getSignedImageUrl;
 const deleteS3File = (bucket, key) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        yield s3.deleteObject({
+        yield exports.s3.deleteObject({
             Bucket: bucket,
             Key: key,
         }).promise();

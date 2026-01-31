@@ -29,6 +29,7 @@ const createStory = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
         const { mediaUrl, mediaType } = req.body;
         if (!mediaUrl)
             return res.status(400).json({ message: 'Media URL is required' });
+        console.log(mediaType);
         // Check Video Permissions (Super Star Only)
         if (mediaType === 'video') {
             if (creator.rankingPriority < 100) {

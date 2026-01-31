@@ -37,7 +37,7 @@ exports.SubscriptionStatus = exports.PlanType = void 0;
 const mongoose_1 = __importStar(require("mongoose"));
 var PlanType;
 (function (PlanType) {
-    PlanType["SUPER_STAR"] = "SUPER_STAR";
+    PlanType["THE_ANGEL"] = "THE_ANGEL";
     PlanType["STAR"] = "STAR";
     PlanType["POPULAR"] = "POPULAR";
     PlanType["TOURIST_ONE_NIGHT"] = "TOURIST_ONE_NIGHT";

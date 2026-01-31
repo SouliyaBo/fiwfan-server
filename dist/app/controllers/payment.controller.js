@@ -101,7 +101,7 @@ const approveSubscription = (req, res) => __awaiter(void 0, void 0, void 0, func
         }
         else {
             // Fallback for legacy hardcoded values if plan not found in DB
-            if (subscription.planType === 'SUPER_STAR')
+            if (subscription.planType === 'THE_ANGEL' || subscription.planType === 'SUPER_STAR')
                 priority = 100;
             else if (subscription.planType === 'STAR')
                 priority = 50;
