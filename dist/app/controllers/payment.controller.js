@@ -48,6 +48,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.getMySubscription = exports.subscribe = exports.getPlans = exports.rejectSubscription = exports.approveSubscription = exports.getPendingSubscriptions = void 0;
 const subscription_model_1 = __importStar(require("../models/subscription.model"));
 const creator_model_1 = __importDefault(require("../models/creator.model"));
+const plan_model_1 = __importDefault(require("../models/plan.model"));
 // --- Admin Controllers ---
 const getPendingSubscriptions = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
@@ -92,17 +93,26 @@ const approveSubscription = (req, res) => __awaiter(void 0, void 0, void 0, func
         subscription.endDate = newEndDate;
         yield subscription.save();
         // 4. Update Creator Ranking Priority based on Plan
+        // Fetch priority from Plan model
+        const plan = yield plan_model_1.default.findOne({ id: subscription.planType });
         let priority = 0;
-        if (subscription.planType === 'SUPER_STAR')
-            priority = 100;
-        else if (subscription.planType === 'STAR')
-            priority = 50;
-        else if (subscription.planType === 'POPULAR')
-            priority = 10;
+        if (plan) {
+            priority = plan.rankingPriority;
+        }
+        else {
+            // Fallback for legacy hardcoded values if plan not found in DB
+            if (subscription.planType === 'SUPER_STAR')
+                priority = 100;
+            else if (subscription.planType === 'STAR')
+                priority = 50;
+            else if (subscription.planType === 'POPULAR')
+                priority = 10;
+        }
         yield creator_model_1.default.findOneAndUpdate({ user: subscription.user }, { $set: { rankingPriority: priority } });
         res.json({ message: 'Subscription approved and ranking updated', subscription });
     }
     catch (error) {
+        console.error('Subscription approval failed:', error);
         res.status(500).json({ message: error.message });
     }
 });
@@ -120,52 +130,20 @@ const rejectSubscription = (req, res) => __awaiter(void 0, void 0, void 0, funct
         res.json({ message: 'Subscription rejected', subscription });
     }
     catch (error) {
+        console.error('Subscription rejection failed:', error);
         res.status(500).json({ message: error.message });
     }
 });
 exports.rejectSubscription = rejectSubscription;
-// Mock Plans Data
-const PLANS = [
-    {
-        id: 'SUPER_STAR',
-        name: 'SUPER STAR',
-        description: 'Boost visibility 300%',
-        features: ['แสดงรายชื่อเป็นอันดับ 1 (บนสุด)', 'ผลการค้นหา: อันดับ 1', 'มีวิดีโอ / รีลแนะนำ', 'การมองเห็นเพิ่มขึ้น 300%'],
-        prices: [
-            { duration: '1 Week', price: 1293, days: 7 },
-            { duration: '2 Weeks', price: 2423, days: 14 },
-            { duration: '4 Weeks', price: 4524, days: 28 }
-        ],
-        theme: 'gold'
-    },
-    {
-        id: 'STAR',
-        name: 'STAR',
-        description: 'Boost visibility 100%',
-        features: ['แสดงรายชื่อเป็นอันดับ 2', 'ผลการค้นหา: อันดับ 2'],
-        prices: [
-            { duration: '1 Week', price: 808, days: 7 },
-            { duration: '2 Weeks', price: 1518, days: 14 },
-            { duration: '4 Weeks', price: 2844, days: 28 }
-        ],
-        theme: 'blue'
-    },
-    {
-        id: 'POPULAR',
-        name: 'POPULAR',
-        description: 'Normal visibility',
-        features: ['แสดงรายชื่อเป็นอันดับ 3', 'ผลการค้นหา: อันดับ 3'],
-        prices: [
-            { duration: '1 Week', price: 486, days: 7 },
-            { duration: '2 Weeks', price: 872, days: 14 },
-            { duration: '4 Weeks', price: 1646, days: 28 }
-        ],
-        theme: 'teal'
+const getPlans = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const plans = yield plan_model_1.default.find({ isActive: true }).sort({ rankingPriority: -1 });
+        res.json(plans);
     }
-];
-const getPlans = (req, res) => {
-    res.json(PLANS);
-};
+    catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+});
 exports.getPlans = getPlans;
 const subscribe = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
@@ -177,6 +155,19 @@ const subscribe = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
         // 1. Verify slipUrl is provided
         if (!slipUrl) {
             return res.status(400).json({ message: 'Slip URL is required' });
+        }
+        // Verify Plan exists (Optional but recommended)
+        const plan = yield plan_model_1.default.findOne({ id: planId });
+        if (!plan) {
+            return res.status(400).json({ message: 'Invalid Plan ID' });
+        }
+        // Check if user already has a pending subscription
+        const existingPending = yield subscription_model_1.default.findOne({
+            user: userId,
+            status: subscription_model_1.SubscriptionStatus.PENDING
+        });
+        if (existingPending) {
+            return res.status(400).json({ message: 'You already have a pending subscription request.' });
         }
         console.log(`Processing subscription request for user ${userId}: ${price} THB for ${planId}`);
         // 2. Calculate dates
@@ -198,6 +189,7 @@ const subscribe = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
         res.status(201).json(subscription);
     }
     catch (error) {
+        console.error('Subscription creation failed:', error);
         res.status(500).json({ message: error.message });
     }
 });

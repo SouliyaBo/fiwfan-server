@@ -76,6 +76,7 @@ const CreatorSchema = new mongoose_1.Schema({
         enum: ['NONE', 'PENDING', 'APPROVED'],
         default: 'NONE'
     },
+    isAcceptingWork: { type: Boolean, default: true },
     packages: [{
             price: Number,
             time: String,

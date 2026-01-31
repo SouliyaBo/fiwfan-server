@@ -48,6 +48,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.updateUserStatus = exports.getUsers = exports.updatePreferences = exports.getMyFavorites = exports.getHistory = exports.recordView = exports.toggleFavorite = exports.updateProfile = exports.getProfile = void 0;
 const user_model_1 = __importDefault(require("../models/user.model"));
 const creator_model_1 = __importDefault(require("../models/creator.model"));
+const subscription_model_1 = __importStar(require("../models/subscription.model"));
 const getProfile = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const userId = req.user.id;
@@ -55,7 +56,17 @@ const getProfile = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
         if (!user) {
             return res.status(404).json({ message: 'User not found' });
         }
-        res.json(user);
+        // Find Active Subscription
+        const activeSub = yield subscription_model_1.default.findOne({
+            user: userId,
+            status: subscription_model_1.SubscriptionStatus.ACTIVE,
+            endDate: { $gt: new Date() }
+        }).sort({ endDate: -1 });
+        const userObj = user.toObject();
+        if (activeSub) {
+            userObj.planId = activeSub.planType;
+        }
+        res.json(userObj);
     }
     catch (error) {
         res.status(500).json({ message: error.message });
@@ -209,7 +220,7 @@ const getUsers = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
             const userObj = u.toObject();
             if (u.role === 'CREATOR') {
                 const Creator = (yield Promise.resolve().then(() => __importStar(require('../models/creator.model')))).default;
-                const creator = yield Creator.findOne({ user: u._id }).select('isVerified _id');
+                const creator = yield Creator.findOne({ user: u._id }).select('isVerified _id verificationStatus verificationData');
                 if (creator) {
                     userObj.creatorProfile = creator;
                 }

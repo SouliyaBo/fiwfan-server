@@ -12,6 +12,7 @@ export interface IJob extends Document {
     budget: number;
     location: string;
     lineId: string;
+    whatsapp?: string;
     images: string[];
     expiresAt: Date;
     status: JobStatus;
@@ -28,6 +29,7 @@ const JobSchema: Schema = new Schema({
     budget: { type: Number, required: true },
     location: { type: String, required: true },
     lineId: { type: String, required: true },
+    whatsapp: { type: String, required: false },
     images: [{ type: String }],
     expiresAt: { type: Date, required: true },
     status: { type: String, enum: Object.values(JobStatus), default: JobStatus.ACTIVE },

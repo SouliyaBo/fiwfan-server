@@ -40,6 +40,9 @@ var PlanType;
     PlanType["SUPER_STAR"] = "SUPER_STAR";
     PlanType["STAR"] = "STAR";
     PlanType["POPULAR"] = "POPULAR";
+    PlanType["TOURIST_ONE_NIGHT"] = "TOURIST_ONE_NIGHT";
+    PlanType["TOURIST_WEEKEND"] = "TOURIST_WEEKEND";
+    PlanType["TOURIST_VVIP"] = "TOURIST_VVIP";
 })(PlanType || (exports.PlanType = PlanType = {}));
 var SubscriptionStatus;
 (function (SubscriptionStatus) {
@@ -52,7 +55,6 @@ const SubscriptionSchema = new mongoose_1.Schema({
     user: { type: mongoose_1.default.Schema.Types.ObjectId, ref: 'User', required: true },
     planType: {
         type: String,
-        enum: Object.values(PlanType),
         required: true
     },
     status: {

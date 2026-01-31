@@ -45,7 +45,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.telegramResetPasswordRequest = exports.completeTelegramRegistration = exports.telegramLogin = exports.login = exports.register = exports.resetPassword = exports.forgotPassword = void 0;
+exports.telegramResetPasswordRequest = exports.completeTelegramRegistration = exports.telegramLogin = exports.login = exports.verifyEmail = exports.register = exports.resetPassword = exports.forgotPassword = void 0;
 const user_model_1 = __importStar(require("../models/user.model"));
 const creator_model_1 = __importDefault(require("../models/creator.model"));
 const agency_model_1 = __importDefault(require("../models/agency.model"));
@@ -68,12 +68,14 @@ const forgotPassword = (req, res) => __awaiter(void 0, void 0, void 0, function*
         yield user.save();
         // In a real app, send email here.
         // For this demo/dev, return the token so frontend can use it.
-        // Construct the reset URL (frontend route)
-        const resetUrl = `http://localhost:3000/auth?mode=reset&token=${resetToken}`;
+        // Construct the reset URL dynamically
+        const frontendUrl = process.env.FRONTEND_URL || req.get('origin') || 'http://localhost:3000';
+        const resetUrl = `${frontendUrl}/auth?mode=reset&token=${resetToken}`;
         res.status(200).json({
             success: true,
-            data: "Email sent (simulated)",
-            browsingUrl: resetUrl // Frontend needs the RAW token, not the hashed one
+            message: "Email sent (simulated)",
+            resetLink: resetUrl, // Frontend needs this to display in dev mode
+            browsingUrl: resetUrl // Legacy support if needed
         });
     }
     catch (error) {
@@ -110,7 +112,7 @@ const resetPassword = (req, res) => __awaiter(void 0, void 0, void 0, function* 
 exports.resetPassword = resetPassword;
 const register = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const { email, password, role, username, creatorType } = req.body;
+        const { email, password, role, username, creatorType, name, birthDate } = req.body;
         const existingUser = yield user_model_1.default.findOne({ email });
         if (existingUser)
             return res.status(400).json({ message: 'User already exists' });
@@ -120,36 +122,73 @@ const register = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
         if (role === user_model_1.Role.CREATOR && creatorType === 'AGENCY') {
             finalRole = user_model_1.Role.AGENCY;
         }
+        // Calculate Age
+        let age = 0;
+        if (birthDate) {
+            const birth = new Date(birthDate);
+            const today = new Date();
+            age = today.getFullYear() - birth.getFullYear();
+            const m = today.getMonth() - birth.getMonth();
+            if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) {
+                age--;
+            }
+        }
+        // Generate Verification Token
+        const verificationToken = crypto_1.default.randomBytes(32).toString('hex');
         const newUser = new user_model_1.default({
             email,
             password: hashedPassword,
             username: username || email.split('@')[0],
+            displayName: name, // Save registration name as displayName
+            age: age, // Save calculated age
             role: finalRole,
-            isCreator: finalRole === user_model_1.Role.CREATOR // Only true models are 'isCreator'
+            isCreator: finalRole === user_model_1.Role.CREATOR,
+            isVerified: true, // TEMPORARY: Bypass email verification
+            // verificationToken: verificationToken // Not needed if bypassed
         });
         yield newUser.save();
         if (finalRole === user_model_1.Role.CREATOR) {
             const newCreator = new creator_model_1.default({
                 user: newUser._id,
-                displayName: newUser.username
+                displayName: name || newUser.username, // Use name first
+                age: age // Set initial age
             });
             yield newCreator.save();
         }
         else if (finalRole === user_model_1.Role.AGENCY) {
             // Create default agency profile for the owner
             const newAgency = new agency_model_1.default({
-                name: (newUser.username || "My") + " Agency",
+                name: (name || newUser.username || "My") + " Agency",
                 owner: newUser._id,
                 description: "Agency description...",
                 location: "Bangkok"
             });
             yield newAgency.save();
         }
+        // Send Verification Email
+        /*
+        try {
+            await sendVerificationEmail(newUser.email, verificationToken);
+        } catch (emailError) {
+            console.error("Failed to send verification email:", emailError);
+        }
+        */
+        // Return token for auto-login or just success
         const token = jsonwebtoken_1.default.sign({ id: newUser._id, role: newUser.role }, process.env.JWT_SECRET || 'secret', { expiresIn: '1d' });
         res.status(201).json({
-            message: 'User registered successfully',
+            message: 'Registration successful.',
+            verifyRequired: false,
+            email: newUser.email,
             token,
-            user: { id: newUser._id, username: newUser.username, role: newUser.role }
+            user: {
+                id: newUser._id,
+                username: newUser.username,
+                role: newUser.role,
+                avatarUrl: newUser.avatarUrl,
+                displayName: newUser.displayName,
+                age: newUser.age,
+                email: newUser.email
+            }
         });
     }
     catch (error) {
@@ -157,6 +196,31 @@ const register = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     }
 });
 exports.register = register;
+const verifyEmail = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const { token } = req.body;
+        if (!token) {
+            return res.status(400).json({ message: 'Verification token is required' });
+        }
+        const user = yield user_model_1.default.findOne({ verificationToken: token });
+        if (!user) {
+            return res.status(400).json({ message: 'Invalid or expired verification token' });
+        }
+        user.isVerified = true;
+        user.verificationToken = undefined; // Clear token
+        yield user.save();
+        // Optional: Auto-login after verification? 
+        // Or just tell them to login. Let's just return success first.
+        res.status(200).json({
+            message: 'Email verified successfully. You can now login.',
+            success: true
+        });
+    }
+    catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+});
+exports.verifyEmail = verifyEmail;
 const login = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         console.log(req.body);
@@ -184,6 +248,7 @@ const login = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
                 role: user.role,
                 avatarUrl: user.avatarUrl,
                 displayName: user.displayName,
+                age: user.age, // Return age
                 email: user.email,
                 province: user.province
             }

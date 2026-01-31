@@ -37,7 +37,11 @@ const getAgencyById = (req, res) => __awaiter(void 0, void 0, void 0, function* 
     try {
         const agency = yield agency_model_1.default.findById(req.params.id).populate({
             path: 'creators',
-            match: { agencyJoinStatus: 'APPROVED' } // Only show approved creators
+            match: { agencyJoinStatus: 'APPROVED' }, // Only show approved creators
+            populate: {
+                path: 'user',
+                select: 'displayName avatarUrl'
+            }
         });
         if (!agency)
             return res.status(404).json({ message: 'Agency not found' });

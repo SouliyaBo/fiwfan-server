@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-const express_1 = __importDefault(require("express"));
+const express_1 = __importDefault(require("express")); // Restart Triggered Again
 const cors_1 = __importDefault(require("cors"));
 const dotenv_1 = __importDefault(require("dotenv"));
 const database_1 = __importDefault(require("./configs/database"));
@@ -16,6 +16,7 @@ dotenv_1.default.config();
 const app = (0, express_1.default)();
 // Connect to Database
 (0, database_1.default)();
+app.set('trust proxy', 1);
 // Middleware
 // Middleware
 app.use((0, cors_1.default)({
@@ -39,6 +40,10 @@ const story_routes_1 = __importDefault(require("./app/routes/story.routes"));
 app.use('/stories', story_routes_1.default);
 const report_routes_1 = __importDefault(require("./app/routes/report.routes"));
 app.use('/reports', report_routes_1.default);
+const plan_routes_1 = __importDefault(require("./app/routes/plan.routes"));
+app.use('/plans', plan_routes_1.default);
+const job_routes_1 = __importDefault(require("./app/routes/job.routes"));
+app.use('/jobs', job_routes_1.default);
 // Post Routes
 const post_controller_1 = require("./app/controllers/post.controller");
 const auth_middleware_1 = require("./app/middleware/auth.middleware");
@@ -46,6 +51,7 @@ app.post('/posts', auth_middleware_1.authenticate, post_controller_1.createPost)
 // Upload Routes
 const upload_controller_1 = require("./app/controllers/upload.controller");
 app.post('/upload', upload_controller_1.upload.single('file'), upload_controller_1.handleUpload);
+app.post('/upload/multiple', upload_controller_1.upload.array('images', 10), upload_controller_1.handleMultipleUpload);
 app.use('/uploads', express_1.default.static('public/uploads'));
 app.get('/', (req, res) => {
     res.send('Fiwfan API (Mongoose Edition) is running!');

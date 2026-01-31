@@ -1,22 +1,22 @@
 "use strict";
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function (o, m, k, k2) {
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
     var desc = Object.getOwnPropertyDescriptor(m, k);
     if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-        desc = { enumerable: true, get: function () { return m[k]; } };
+      desc = { enumerable: true, get: function() { return m[k]; } };
     }
     Object.defineProperty(o, k2, desc);
-}) : (function (o, m, k, k2) {
+}) : (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
     o[k2] = m[k];
 }));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function (o, v) {
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
     Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function (o, v) {
+}) : function(o, v) {
     o["default"] = v;
 });
 var __importStar = (this && this.__importStar) || (function () {
-    var ownKeys = function (o) {
+    var ownKeys = function(o) {
         ownKeys = Object.getOwnPropertyNames || function (o) {
             var ar = [];
             for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
@@ -49,17 +49,24 @@ exports.getKycStatus = exports.submitKyc = exports.updateCreatorVerification = e
 const creator_model_1 = __importDefault(require("../models/creator.model"));
 const user_model_1 = __importDefault(require("../models/user.model"));
 const subscription_model_1 = __importStar(require("../models/subscription.model"));
+const setting_model_1 = __importDefault(require("../models/setting.model"));
 const getCreators = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { location, usePreferences, name, lineId, gender, province, country, ageMin, ageMax, heightMin, heightMax, weightMin, weightMax, chestMin, chestMax, waistMin, waistMax, hipsMin, hipsMax } = req.query;
-        let query = { isVerified: true };
-        // Get users with ACTIVE subscription
-        const activeSubs = yield subscription_model_1.default.find({
-            status: subscription_model_1.SubscriptionStatus.ACTIVE,
-            endDate: { $gt: new Date() }
-        }).distinct('user');
-        // Filter creators by active subscription
-        query.user = { $in: activeSubs };
+        let query = { isVerified: true, isAcceptingWork: { $ne: false } };
+        // Check Free Mode
+        const freeModeSetting = yield setting_model_1.default.findOne({ key: 'isFreeMode' });
+        const isFreeMode = (freeModeSetting === null || freeModeSetting === void 0 ? void 0 : freeModeSetting.value) === 'true';
+        // Get users with ACTIVE subscription IF NOT in Free Mode
+        let activeSubs = [];
+        if (!isFreeMode) {
+            activeSubs = yield subscription_model_1.default.find({
+                status: subscription_model_1.SubscriptionStatus.ACTIVE,
+                endDate: { $gt: new Date() }
+            }).distinct('user');
+            // Filter creators by active subscription
+            query.user = { $in: activeSubs };
+        }
         // Apply Preferences if user is logged in and requested it
         if (usePreferences === 'true' && req.user) {
             const user = yield user_model_1.default.findById(req.user.id);
@@ -172,10 +179,34 @@ const getCreators = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
                 query = searchFilter;
             }
         }
-        const creators = yield creator_model_1.default.find(query)
+        const allCreators = yield creator_model_1.default.find(query)
             .populate('user', 'username email avatarUrl')
             .sort({ rankingPriority: -1, isVerified: -1, updatedAt: -1 });
-        res.json(creators);
+        // Filter out creators whose user account might have been deleted (null user)
+        const creators = allCreators.filter(c => c.user);
+        // Enrich with Plan Name and Review Count
+        const creatorUserIds = creators.map(c => c.user._id);
+        const creatorIds = creators.map(c => c._id);
+        const subscriptions = yield subscription_model_1.default.find({
+            user: { $in: creatorUserIds },
+            status: subscription_model_1.SubscriptionStatus.ACTIVE,
+            endDate: { $gt: new Date() }
+        });
+        // Aggregate Review Counts
+        const Review = (yield Promise.resolve().then(() => __importStar(require('../models/review.model')))).default;
+        const reviewCounts = yield Review.aggregate([
+            { $match: { creator: { $in: creatorIds } } },
+            { $group: { _id: "$creator", count: { $sum: 1 } } }
+        ]);
+        const creatorsWithPlan = creators.map(c => {
+            const sub = subscriptions.find(s => s.user.toString() === c.user._id.toString());
+            const planName = isFreeMode ? ((sub === null || sub === void 0 ? void 0 : sub.planType) || "Free Mode") : ((sub === null || sub === void 0 ? void 0 : sub.planType) || "");
+            const reviewCountObj = reviewCounts.find(r => r._id.toString() === c._id.toString());
+            const reviewCount = reviewCountObj ? reviewCountObj.count : 0;
+            return Object.assign(Object.assign({}, c.toObject()), { planName,
+                reviewCount });
+        });
+        res.json(creatorsWithPlan);
     }
     catch (error) {
         res.status(500).json({ message: error.message });
@@ -184,18 +215,23 @@ const getCreators = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
 exports.getCreators = getCreators;
 const getZoneStats = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        // 1. Get User IDs with ACTIVE subscriptions that haven't expired
-        const activeSubs = yield subscription_model_1.default.find({
-            status: subscription_model_1.SubscriptionStatus.ACTIVE,
-            endDate: { $gt: new Date() }
-        }).distinct('user');
+        // Check Free Mode
+        const freeModeSetting = yield setting_model_1.default.findOne({ key: 'isFreeMode' });
+        const isFreeMode = (freeModeSetting === null || freeModeSetting === void 0 ? void 0 : freeModeSetting.value) === 'true';
+        let activeSubs = [];
+        let matchQuery = { isVerified: true, isAcceptingWork: { $ne: false } };
+        if (!isFreeMode) {
+            // 1. Get User IDs with ACTIVE subscriptions that haven't expired
+            activeSubs = yield subscription_model_1.default.find({
+                status: subscription_model_1.SubscriptionStatus.ACTIVE,
+                endDate: { $gt: new Date() }
+            }).distinct('user');
+            matchQuery.user = { $in: activeSubs };
+        }
         // 2. Aggregate Creators who match those User IDs
         const stats = yield creator_model_1.default.aggregate([
             {
-                $match: {
-                    user: { $in: activeSubs },
-                    isVerified: true
-                }
+                $match: matchQuery
             },
             {
                 $project: {
@@ -304,8 +340,11 @@ const updateCreatorProfile = (req, res) => __awaiter(void 0, void 0, void 0, fun
     try {
         const userId = req.user.id;
         const updates = req.body;
+        // Check Free Mode
+        const freeModeSetting = yield setting_model_1.default.findOne({ key: 'isFreeMode' });
+        const isFreeMode = (freeModeSetting === null || freeModeSetting === void 0 ? void 0 : freeModeSetting.value) === 'true';
         // Check Subscription if updating images (Gallery)
-        if (updates.images && updates.images.length > 0) {
+        if (updates.images && updates.images.length > 0 && !isFreeMode) {
             const activeSubscription = yield subscription_model_1.default.findOne({
                 user: userId,
                 status: subscription_model_1.SubscriptionStatus.ACTIVE,
@@ -315,6 +354,16 @@ const updateCreatorProfile = (req, res) => __awaiter(void 0, void 0, void 0, fun
                 return res.status(403).json({
                     error: 'Subscription required to upload gallery images',
                     code: 'SUBSCRIPTION_REQUIRED'
+                });
+            }
+        }
+        else if (updates.images && updates.images.length > 0 && isFreeMode) {
+            // Free Mode: Check KYC
+            const creatorCheck = yield creator_model_1.default.findOne({ user: userId });
+            if (!creatorCheck || creatorCheck.verificationStatus !== 'APPROVED') {
+                return res.status(403).json({
+                    error: 'KYC Verification required for Free Mode',
+                    code: 'KYC_REQUIRED'
                 });
             }
         }
@@ -345,31 +394,47 @@ exports.updateCreatorProfile = updateCreatorProfile;
 const getRecommendedCreators = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { excludeId } = req.query;
-        // 1. Get users with ACTIVE subscription
-        const activeSubs = yield subscription_model_1.default.find({
-            status: subscription_model_1.SubscriptionStatus.ACTIVE,
-            endDate: { $gt: new Date() }
-        }).distinct('user'); // Get distinct user IDs
+        // Check Free Mode
+        const freeModeSetting = yield setting_model_1.default.findOne({ key: 'isFreeMode' });
+        const isFreeMode = (freeModeSetting === null || freeModeSetting === void 0 ? void 0 : freeModeSetting.value) === 'true';
+        // 1. Get users with ACTIVE subscription IF NOT in Free Mode
+        let activeSubs = [];
+        if (!isFreeMode) {
+            activeSubs = yield subscription_model_1.default.find({
+                status: subscription_model_1.SubscriptionStatus.ACTIVE,
+                endDate: { $gt: new Date() }
+            }).distinct('user'); // Get distinct user IDs
+        }
         // 2. Build Aggregation
-        const pipeline = [
-            {
-                $match: Object.assign({ user: { $in: activeSubs } }, (excludeId && typeof excludeId === 'string' ? { _id: { $ne: new (yield Promise.resolve().then(() => __importStar(require('mongoose')))).Types.ObjectId(excludeId) } } : {}))
-            },
-            { $sample: { size: 4 } }
-        ];
+        const pipeline = [];
+        const matchStage = {};
+        if (!isFreeMode) {
+            matchStage.user = { $in: activeSubs };
+        }
+        if (excludeId && typeof excludeId === 'string') {
+            matchStage._id = { $ne: new (yield Promise.resolve().then(() => __importStar(require('mongoose')))).Types.ObjectId(excludeId) };
+        }
+        // Filter only those accepting work (or undefined for legacy)
+        matchStage.isAcceptingWork = { $ne: false };
+        if (Object.keys(matchStage).length > 0) {
+            pipeline.push({ $match: matchStage });
+        }
+        pipeline.push({ $sample: { size: 4 } });
         const recommended = yield creator_model_1.default.aggregate(pipeline);
         // 3. Populate User Data
         const populatedRecommended = yield creator_model_1.default.populate(recommended, { path: 'user', select: 'avatarUrl' });
         // 4. Attach Active Subscription Object (needed for frontend logic)
         // Since we filtered by activeSubs, we know they have one, but we need the details (planType etc)
-        const result = yield Promise.all(populatedRecommended.map((creator) => __awaiter(void 0, void 0, void 0, function* () {
+        const result = (yield Promise.all(populatedRecommended.map((creator) => __awaiter(void 0, void 0, void 0, function* () {
+            if (!creator.user)
+                return null;
             const sub = yield subscription_model_1.default.findOne({
                 user: creator.user._id || creator.user, // Handle populated or not
                 status: subscription_model_1.SubscriptionStatus.ACTIVE,
                 endDate: { $gt: new Date() }
             }).select('planType status endDate');
             return Object.assign(Object.assign({}, creator), { activeSubscription: sub });
-        })));
+        })))).filter(Boolean);
         res.json(result);
     }
     catch (error) {
@@ -384,8 +449,30 @@ const updateCreatorVerification = (req, res) => __awaiter(void 0, void 0, void 0
             return res.status(403).json({ message: 'Access denied' });
         }
         const { id } = req.params;
-        const { isVerified } = req.body;
-        const creator = yield creator_model_1.default.findByIdAndUpdate(id, { isVerified }, { new: true });
+        const { isVerified, verificationStatus, rejectionReason } = req.body;
+        const updateData = {};
+        if (typeof isVerified === 'boolean')
+            updateData.isVerified = isVerified;
+        if (verificationStatus) {
+            updateData.verificationStatus = verificationStatus;
+            // Clear verification data if verified? Or keep history?
+            // If rejected, maybe save reason
+            if (verificationStatus === 'REJECTED' && rejectionReason) {
+                if (!updateData.verificationData)
+                    updateData.verificationData = {};
+                updateData.verificationData.rejectionReason = rejectionReason;
+            }
+        }
+        // Setup nested update for rejection reason if needed, but simple merge is safer for now
+        // Let's use $set for flexibility if we were using raw mongo commands, but mongoose findByIdAndUpdate with partial object is fine.
+        // Actually, verificationData is a nested object.
+        let creator;
+        if (verificationStatus === 'REJECTED' && rejectionReason) {
+            creator = yield creator_model_1.default.findByIdAndUpdate(id, Object.assign(Object.assign({}, updateData), { $set: { "verificationData.rejectionReason": rejectionReason } }), { new: true });
+        }
+        else {
+            creator = yield creator_model_1.default.findByIdAndUpdate(id, updateData, { new: true });
+        }
         if (!creator)
             return res.status(404).json({ message: 'Creator not found' });
         res.json(creator);

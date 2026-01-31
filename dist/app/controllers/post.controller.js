@@ -61,10 +61,25 @@ const createPost = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
             endDate: { $gt: new Date() }
         });
         if (!activeSubscription) {
-            return res.status(403).json({
-                error: 'Subscription required',
-                code: 'SUBSCRIPTION_REQUIRED'
-            });
+            // Check Free Mode and KYC
+            const Setting = (yield Promise.resolve().then(() => __importStar(require('../models/setting.model')))).default;
+            const freeModeSetting = yield Setting.findOne({ key: 'isFreeMode' });
+            const isFreeMode = (freeModeSetting === null || freeModeSetting === void 0 ? void 0 : freeModeSetting.value) === 'true';
+            if (!isFreeMode) {
+                return res.status(403).json({
+                    error: 'Subscription required',
+                    code: 'SUBSCRIPTION_REQUIRED'
+                });
+            }
+            // Free Mode is ON, check KYC
+            const creatorCheck = yield creator_model_1.default.findOne({ user: userId });
+            if (!creatorCheck || creatorCheck.verificationStatus !== 'APPROVED') {
+                return res.status(403).json({
+                    error: 'KYC Verification required for Free Mode',
+                    code: 'KYC_REQUIRED'
+                });
+            }
+            // If KYC approved, allow proceed
         }
         const creator = yield creator_model_1.default.findOne({ user: userId });
         console.log("Creator found:", creator);

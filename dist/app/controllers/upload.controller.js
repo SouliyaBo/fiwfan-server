@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.handleUpload = exports.upload = void 0;
+exports.handleMultipleUpload = exports.handleUpload = exports.upload = void 0;
 const multer_1 = __importDefault(require("multer"));
 const path_1 = __importDefault(require("path"));
 const fs_1 = __importDefault(require("fs"));
@@ -40,3 +40,15 @@ const handleUpload = (req, res) => {
     res.json({ url });
 };
 exports.handleUpload = handleUpload;
+const handleMultipleUpload = (req, res) => {
+    if (!req.files || req.files.length === 0) {
+        return res.status(400).json({ error: 'No files uploaded' });
+    }
+    const urls = req.files.map((file) => {
+        const protocol = req.protocol;
+        const host = req.get('host');
+        return `${protocol}://${host}/uploads/${file.filename}`;
+    });
+    res.json({ urls });
+};
+exports.handleMultipleUpload = handleMultipleUpload;
