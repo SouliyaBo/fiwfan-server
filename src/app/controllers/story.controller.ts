@@ -1,7 +1,6 @@
 import { Request, Response } from 'express';
 import Story from '../models/story.model';
 import Creator from '../models/creator.model';
-import User from '../models/user.model';
 import { deleteS3File } from '../files/helper';
 import { BUCKET_NAME } from '../files';
 
@@ -17,7 +16,7 @@ export const createStory = async (req: Request, res: Response) => {
         const { mediaUrl, mediaType } = req.body;
 
         if (!mediaUrl) return res.status(400).json({ message: 'Media URL is required' });
-
+        console.log(mediaType);
         // Check Video Permissions (Super Star Only)
         if (mediaType === 'video') {
             if (creator.rankingPriority < 100) {

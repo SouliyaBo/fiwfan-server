@@ -7,8 +7,8 @@ dotenv.config();
 
 const PLANS = [
     {
-        id: 'SUPER_STAR',
-        name: 'SUPER STAR',
+        id: 'THE_ANGEL',
+        name: 'THE ANGEL',
         description: 'Boost visibility 300%',
         features: ['แสดงรายชื่อเป็นอันดับ 1 (บนสุด)', 'ผลการค้นหา: อันดับ 1', 'มีวิดีโอ / รีลแนะนำ', 'การมองเห็นเพิ่มขึ้น 300%'],
         prices: [

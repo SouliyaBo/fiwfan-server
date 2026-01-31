@@ -1,7 +1,7 @@
 import mongoose, { Document, Schema } from 'mongoose';
 
 export enum PlanType {
-    SUPER_STAR = 'SUPER_STAR',
+    THE_ANGEL = 'THE_ANGEL',
     STAR = 'STAR',
     POPULAR = 'POPULAR',
     TOURIST_ONE_NIGHT = 'TOURIST_ONE_NIGHT',
