@@ -80,7 +80,7 @@ export const resetPassword = async (req: Request, res: Response) => {
 
 export const register = async (req: Request, res: Response) => {
     try {
-        const { email, password, role, username, creatorType } = req.body;
+        const { email, password, role, username, creatorType, name, birthDate } = req.body;
 
         const existingUser = await User.findOne({ email });
         if (existingUser) return res.status(400).json({ message: 'User already exists' });
@@ -93,6 +93,18 @@ export const register = async (req: Request, res: Response) => {
             finalRole = Role.AGENCY;
         }
 
+        // Calculate Age
+        let age = 0;
+        if (birthDate) {
+            const birth = new Date(birthDate);
+            const today = new Date();
+            age = today.getFullYear() - birth.getFullYear();
+            const m = today.getMonth() - birth.getMonth();
+            if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) {
+                age--;
+            }
+        }
+
         // Generate Verification Token
         const verificationToken = crypto.randomBytes(32).toString('hex');
 
@@ -100,8 +112,10 @@ export const register = async (req: Request, res: Response) => {
             email,
             password: hashedPassword,
             username: username || email.split('@')[0],
+            displayName: name, // Save registration name as displayName
+            age: age, // Save calculated age
             role: finalRole,
-            isCreator: finalRole === Role.CREATOR, // Only true models are 'isCreator'
+            isCreator: finalRole === Role.CREATOR,
             isVerified: true, // TEMPORARY: Bypass email verification
             // verificationToken: verificationToken // Not needed if bypassed
         });
@@ -111,13 +125,14 @@ export const register = async (req: Request, res: Response) => {
         if (finalRole === Role.CREATOR) {
             const newCreator = new Creator({
                 user: newUser._id,
-                displayName: newUser.username
+                displayName: name || newUser.username, // Use name first
+                age: age // Set initial age
             });
             await newCreator.save();
         } else if (finalRole === Role.AGENCY) {
             // Create default agency profile for the owner
             const newAgency = new Agency({
-                name: (newUser.username || "My") + " Agency",
+                name: (name || newUser.username || "My") + " Agency",
                 owner: newUser._id,
                 description: "Agency description...",
                 location: "Bangkok"
@@ -148,6 +163,7 @@ export const register = async (req: Request, res: Response) => {
                 role: newUser.role,
                 avatarUrl: newUser.avatarUrl,
                 displayName: newUser.displayName,
+                age: newUser.age,
                 email: newUser.email
             }
         });
@@ -219,6 +235,7 @@ export const login = async (req: Request, res: Response) => {
                 role: user.role,
                 avatarUrl: user.avatarUrl,
                 displayName: user.displayName,
+                age: user.age, // Return age
                 email: user.email,
                 province: user.province
             }
