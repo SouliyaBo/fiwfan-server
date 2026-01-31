@@ -7,7 +7,7 @@ import Setting from '../models/setting.model';
 export const getCreators = async (req: any, res: Response) => {
     try {
         const { location, usePreferences, name, lineId, gender, province, country, ageMin, ageMax, heightMin, heightMax, weightMin, weightMax, chestMin, chestMax, waistMin, waistMax, hipsMin, hipsMax } = req.query;
-        let query: any = { isVerified: true };
+        let query: any = { isVerified: true, isAcceptingWork: { $ne: false } };
 
         // Check Free Mode
         const freeModeSetting = await Setting.findOne({ key: 'isFreeMode' });
@@ -177,7 +177,7 @@ export const getZoneStats = async (req: Request, res: Response) => {
         const isFreeMode = freeModeSetting?.value === 'true';
 
         let activeSubs: any[] = [];
-        let matchQuery: any = { isVerified: true };
+        let matchQuery: any = { isVerified: true, isAcceptingWork: { $ne: false } };
 
         if (!isFreeMode) {
             // 1. Get User IDs with ACTIVE subscriptions that haven't expired
@@ -393,6 +393,9 @@ export const getRecommendedCreators = async (req: Request, res: Response) => {
         if (excludeId && typeof excludeId === 'string') {
             matchStage._id = { $ne: new (await import('mongoose')).Types.ObjectId(excludeId) };
         }
+
+        // Filter only those accepting work (or undefined for legacy)
+        matchStage.isAcceptingWork = { $ne: false };
 
         if (Object.keys(matchStage).length > 0) {
             pipeline.push({ $match: matchStage });

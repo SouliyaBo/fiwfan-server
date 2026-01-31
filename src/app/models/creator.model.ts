@@ -25,6 +25,7 @@ export interface ICreator extends Document {
     whatsapp?: string;
     agency?: mongoose.Types.ObjectId;
     agencyJoinStatus: 'NONE' | 'PENDING' | 'APPROVED';
+    isAcceptingWork: boolean;
     images: string[];
     createdAt: Date;
     updatedAt: Date;
@@ -87,6 +88,7 @@ const CreatorSchema: Schema = new Schema({
         enum: ['NONE', 'PENDING', 'APPROVED'],
         default: 'NONE'
     },
+    isAcceptingWork: { type: Boolean, default: true },
     packages: [{
         price: Number,
         time: String,
