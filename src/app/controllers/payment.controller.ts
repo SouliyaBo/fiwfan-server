@@ -67,8 +67,8 @@ export const approveSubscription = async (req: any, res: Response) => {
         } else {
             // Fallback for legacy hardcoded values if plan not found in DB
             if (subscription.planType === 'THE_ANGEL' || subscription.planType === 'SUPER_STAR') priority = 100;
-            else if (subscription.planType === 'STAR') priority = 50;
-            else if (subscription.planType === 'POPULAR') priority = 10;
+            else if (subscription.planType === 'POPULAR') priority = 50;
+            else if (subscription.planType === 'RISING_STAR' || subscription.planType === 'STAR') priority = 10;
         }
 
         await Creator.findOneAndUpdate(
