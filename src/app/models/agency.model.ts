@@ -14,6 +14,7 @@ export interface IAgency extends Document {
     lineId?: string;
     phone?: string;
     website?: string;
+    country?: string;
     isVerified: boolean;
     kycStatus: 'NONE' | 'PENDING' | 'APPROVED' | 'REJECTED';
     rejectionReason?: string;
@@ -33,6 +34,7 @@ const AgencySchema: Schema = new Schema({
     lineId: { type: String },
     phone: { type: String },
     website: { type: String },
+    country: { type: String, default: 'Thailand' },
     isVerified: { type: Boolean, default: false },
     kycStatus: {
         type: String,
