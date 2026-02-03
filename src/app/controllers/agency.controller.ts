@@ -6,14 +6,68 @@ import Creator from '../models/creator.model';
 export const getAgencies = async (req: Request, res: Response) => {
     try {
         // Fetch agencies and populate a few creators for preview
-        const agencies = await Agency.find()
+        const agencies: any[] = await Agency.find()
             .populate({
                 path: 'creators',
                 match: { agencyJoinStatus: 'APPROVED' }, // Only show approved creators in public list
-                select: 'displayName images user',
-                perDocumentLimit: 5
+                select: 'displayName images user country zones isVerified isHot isAcceptingWork age',
+                perDocumentLimit: 5,
+                populate: {
+                    path: 'user',
+                    select: 'displayName avatarUrl'
+                }
             })
             .lean();
+
+        // Enrich creators with Plan Name and Review Count
+        const Subscription = (await import('../models/subscription.model')).default;
+        const Review = (await import('../models/review.model')).default;
+        const Setting = (await import('../models/setting.model')).default;
+
+        // Check Free Mode
+        const freeModeSetting = await Setting.findOne({ key: 'isFreeMode' });
+        const isFreeMode = freeModeSetting?.value === 'true';
+
+        // Collect all creators to fetch related data in bulk
+        const allCreators = agencies.flatMap(a => a.creators || []);
+        const creatorUserIds = allCreators
+            .map(c => c.user?._id || c.user)
+            .filter(id => id);
+        const creatorIds = allCreators.map(c => c._id);
+
+        if (creatorUserIds.length > 0) {
+            const subscriptions = await Subscription.find({
+                user: { $in: creatorUserIds },
+                status: 'ACTIVE',
+                endDate: { $gt: new Date() }
+            });
+
+            const reviewCounts = await Review.aggregate([
+                { $match: { creator: { $in: creatorIds } } },
+                { $group: { _id: "$creator", count: { $sum: 1 } } }
+            ]);
+
+            // Map data back to agencies
+            agencies.forEach(agency => {
+                if (agency.creators) {
+                    agency.creators = agency.creators.map((c: any) => {
+                        const userId = (c.user?._id || c.user)?.toString();
+                        const sub = subscriptions.find(s => s.user.toString() === userId);
+                        const planName = isFreeMode ? (sub?.planType || "Free Mode") : (sub?.planType || "");
+
+                        const reviewCountObj = reviewCounts.find(r => r._id.toString() === c._id.toString());
+                        const reviewCount = reviewCountObj ? reviewCountObj.count : 0;
+
+                        return {
+                            ...c,
+                            planName,
+                            planId: planName,
+                            reviewCount
+                        };
+                    });
+                }
+            });
+        }
 
         res.json(agencies);
     } catch (error: any) {
@@ -23,15 +77,64 @@ export const getAgencies = async (req: Request, res: Response) => {
 
 export const getAgencyById = async (req: Request, res: Response) => {
     try {
-        const agency = await Agency.findById(req.params.id).populate({
+        const agency: any = await Agency.findById(req.params.id).populate({
             path: 'creators',
             match: { agencyJoinStatus: 'APPROVED' }, // Only show approved creators
             populate: {
                 path: 'user',
                 select: 'displayName avatarUrl'
             }
-        });
+        }).lean();
+
         if (!agency) return res.status(404).json({ message: 'Agency not found' });
+
+        // Enrich creators with Plan Name (similar to getCreators)
+        const Subscription = (await import('../models/subscription.model')).default;
+        const Setting = (await import('../models/setting.model')).default; // Import Setting model
+
+        // Check Free Mode
+        const freeModeSetting = await Setting.findOne({ key: 'isFreeMode' });
+        const isFreeMode = freeModeSetting?.value === 'true';
+
+        if (agency.creators && agency.creators.length > 0) {
+            const creators = agency.creators as any[];
+            // Handle both populated user object and raw ID cases safe for lean
+            const creatorUserIds = creators
+                .map(c => c.user?._id || c.user)
+                .filter(id => id); // Filter out nulls/undefined
+
+            const subscriptions = await Subscription.find({
+                user: { $in: creatorUserIds },
+                status: 'ACTIVE',
+                endDate: { $gt: new Date() }
+            });
+
+            // Aggregate Review Counts
+            const Review = (await import('../models/review.model')).default;
+            const creatorIds = creators.map(c => c._id);
+            const reviewCounts = await Review.aggregate([
+                { $match: { creator: { $in: creatorIds } } },
+                { $group: { _id: "$creator", count: { $sum: 1 } } }
+            ]);
+
+            // Map creators to include planName and reviewCount
+            agency.creators = creators.map(c => {
+                const userId = (c.user?._id || c.user)?.toString();
+                const sub = subscriptions.find(s => s.user.toString() === userId);
+                const planName = isFreeMode ? (sub?.planType || "Free Mode") : (sub?.planType || "");
+
+                const reviewCountObj = reviewCounts.find(r => r._id.toString() === c._id.toString());
+                const reviewCount = reviewCountObj ? reviewCountObj.count : 0;
+
+                return {
+                    ...c,
+                    planName,
+                    planId: planName, // Add planId for compatibility
+                    reviewCount
+                };
+            });
+        }
+
         res.json(agency);
     } catch (error: any) {
         res.status(500).json({ message: error.message });
