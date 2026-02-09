@@ -47,13 +47,13 @@ export const getReports = async (req: AuthRequest, res: Response) => {
             const reportObj = r.toObject();
             if (r.targetType === 'USER') {
                 const User = (await import('../models/user.model')).default;
-                reportObj.target = await User.findById(r.targetId, 'username email');
+                reportObj.target = await User.findById(r.targetId, 'username displayName email avatarUrl');
             } else if (r.targetType === 'CREATOR') {
                 const Creator = (await import('../models/creator.model')).default;
-                reportObj.target = await Creator.findById(r.targetId, 'displayName bio images');
+                reportObj.target = await Creator.findById(r.targetId, 'displayName bio images user');
             } else if (r.targetType === 'REVIEW') {
                 const Review = (await import('../models/review.model')).default;
-                reportObj.target = await Review.findById(r.targetId);
+                reportObj.target = await Review.findById(r.targetId).populate('user', 'username displayName avatarUrl');
             }
             return reportObj;
         }));

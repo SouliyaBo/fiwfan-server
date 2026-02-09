@@ -23,6 +23,21 @@ export const getPendingSubscriptions = async (req: any, res: Response) => {
     }
 };
 
+export const getPaymentHistory = async (req: any, res: Response) => {
+    try {
+        if (req.user.role !== 'ADMIN') return res.status(403).json({ message: 'Access denied' });
+
+        const subscriptions = await Subscription.find({ status: { $ne: SubscriptionStatus.PENDING } })
+            .populate('user', 'displayName username email')
+            .sort({ updatedAt: -1 }) // Sort by last updated
+            .limit(100); // Limit to last 100 for now
+
+        res.json(subscriptions);
+    } catch (error: any) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
 export const approveSubscription = async (req: any, res: Response) => {
     try {
         if (req.user.role !== 'ADMIN') return res.status(403).json({ message: 'Access denied' });

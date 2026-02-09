@@ -44,6 +44,7 @@ export interface IUser extends Document {
     };
     // Verification
     isVerified: boolean;
+    isActive: boolean;
     verificationToken?: string;
     resetPasswordToken?: string;
     resetPasswordExpires?: Date;
@@ -58,6 +59,7 @@ const UserSchema: Schema = new Schema({
     role: { type: String, enum: Object.values(Role), default: Role.USER },
     lineId: { type: String },
     isCreator: { type: Boolean, default: false },
+    isActive: { type: Boolean, default: true },
 
     // Verification
     isVerified: { type: Boolean, default: false },
