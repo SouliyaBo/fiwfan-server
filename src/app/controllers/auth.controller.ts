@@ -116,8 +116,8 @@ export const register = async (req: Request, res: Response) => {
             age: age, // Save calculated age
             role: finalRole,
             isCreator: finalRole === Role.CREATOR,
-            isVerified: true, // TEMPORARY: Bypass email verification
-            // verificationToken: verificationToken // Not needed if bypassed
+            isVerified: false, // Enforce email verification
+            verificationToken: verificationToken
         });
 
         await newUser.save();
@@ -141,22 +141,22 @@ export const register = async (req: Request, res: Response) => {
         }
 
         // Send Verification Email
-        /* 
         try {
             await sendVerificationEmail(newUser.email, verificationToken);
         } catch (emailError) {
             console.error("Failed to send verification email:", emailError);
+            // Optional: You might want to delete the user if email fails, or allow them to resend later.
+            // For now, we will just log it and they can try to login -> trigger resend logic (if implemented)
         }
-        */
 
         // Return token for auto-login or just success
-        const token = jwt.sign({ id: newUser._id, role: newUser.role }, process.env.JWT_SECRET || 'secret', { expiresIn: '1d' });
+        // const token = jwt.sign({ id: newUser._id, role: newUser.role }, process.env.JWT_SECRET || 'secret', { expiresIn: '1d' });
 
         res.status(201).json({
-            message: 'Registration successful.',
-            verifyRequired: false,
+            message: 'Registration successful. Please check your email to verify your account.',
+            verifyRequired: true,
             email: newUser.email,
-            token,
+            // token, // Do not return token if verification is required
             user: {
                 id: newUser._id,
                 username: newUser.username,
@@ -219,6 +219,10 @@ export const login = async (req: Request, res: Response) => {
 
         if (!user || !user.password) {
             return res.status(401).json({ message: 'Invalid credentials' });
+        }
+
+        if (!user.isVerified) {
+            return res.status(403).json({ message: 'Please verify your email before logging in.' });
         }
 
         const isMatch = await bcrypt.compare(password, user.password);

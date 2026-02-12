@@ -1,41 +1,29 @@
-import AWS from 'aws-sdk';
+import { Resend } from 'resend';
 import dotenv from 'dotenv';
 
 dotenv.config();
 
-// Initialize SES
-const ses = new AWS.SES({
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-    region: process.env.AWS_REGION || 'ap-southeast-1'
-});
+// Initialize Resend
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 export const sendEmail = async (to: string, subject: string, body: string) => {
-    const params = {
-        Source: process.env.AWS_SENDER_EMAIL || 'noreply@phusao.com', // Replace with your verified sender email
-        Destination: {
-            ToAddresses: [to]
-        },
-        Message: {
-            Subject: {
-                Data: subject
-            },
-            Body: {
-                Html: {
-                    Data: body
-                }
-            }
-        }
-    };
-
     try {
-        const result = await ses.sendEmail(params).promise();
-        console.log(`Email sent to ${to}: ${result.MessageId}`);
-        return result;
+        const { data, error } = await resend.emails.send({
+            from: 'Phusao <noreply@phusao.com>', // Verified domain
+            to: [to],
+            subject: subject,
+            html: body,
+        });
+
+        if (error) {
+            console.error(`Error sending email to ${to}:`, error);
+            throw new Error(error.message);
+        }
+
+        console.log(`Email sent to ${to}: ${data?.id}`);
+        return data;
     } catch (error) {
         console.error(`Error sending email to ${to}:`, error);
-        // For development/sandbox safety, we might fail silently or just log
-        // But throwing helps debug
         throw error;
     }
 };
