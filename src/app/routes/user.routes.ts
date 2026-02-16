@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { authenticate } from '../middleware/auth.middleware';
-import { updateProfile, getProfile, getUsers, updateUserStatus } from '../controllers/user.controller';
+import { updateProfile, getProfile, getUsers, updateUserStatus, updateUserByAdmin } from '../controllers/user.controller';
 
 import { getUserDashboardStats } from '../controllers/dashboard.controller';
 import { toggleFavorite, recordView, getHistory, getMyFavorites, updatePreferences } from '../controllers/user.controller';
@@ -18,5 +18,9 @@ router.post('/favorites', authenticate, toggleFavorite);
 router.get('/favorites', authenticate, getMyFavorites);
 router.post('/views', authenticate, recordView);
 router.get('/history', authenticate, getHistory);
+
+// Admin Action
+// Admin Action
+router.put('/:id/admin', authenticate, updateUserByAdmin);
 
 export default router;

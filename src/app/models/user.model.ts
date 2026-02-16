@@ -14,6 +14,8 @@ export interface IUser extends Document {
     displayName?: string;
     avatarUrl?: string;
     role: Role;
+    phoneNumber?: string;
+    lineId?: string;
     isCreator: boolean;
     createdAt: Date;
     updatedAt: Date;
@@ -57,6 +59,7 @@ const UserSchema: Schema = new Schema({
     displayName: { type: String },
     avatarUrl: { type: String },
     role: { type: String, enum: Object.values(Role), default: Role.USER },
+    phoneNumber: { type: String },
     lineId: { type: String },
     isCreator: { type: Boolean, default: false },
     isActive: { type: Boolean, default: true },

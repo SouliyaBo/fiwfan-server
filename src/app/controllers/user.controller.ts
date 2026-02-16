@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import User from '../models/user.model';
 import Creator from '../models/creator.model';
 import Subscription, { SubscriptionStatus } from '../models/subscription.model';
+import bcrypt from 'bcrypt';
 
 export const getProfile = async (req: Request | any, res: Response) => {
     try {
@@ -232,6 +233,76 @@ export const updateUserStatus = async (req: Request | any, res: Response) => {
 
         const user = await User.findByIdAndUpdate(id, { isActive }, { new: true });
         if (!user) return res.status(404).json({ message: 'User not found' });
+
+        res.json(user);
+    } catch (error: any) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+export const updateUserByAdmin = async (req: Request | any, res: Response) => {
+    try {
+        // @ts-ignore
+        if (req.user.role !== 'ADMIN') {
+            return res.status(403).json({ message: 'Access denied' });
+        }
+
+        const { id } = req.params;
+        const updates = req.body;
+
+        // 1. Update User
+        const userUpdates: any = {};
+        const allowedUserFields = [
+            'username', 'email', 'displayName', 'role', 'isActive',
+            'lineId', 'phoneNumber'
+        ];
+
+        allowedUserFields.forEach(field => {
+            if (updates[field] !== undefined) userUpdates[field] = updates[field];
+        });
+
+        // Password update
+        if (updates.password && updates.password.trim() !== "") {
+            userUpdates.password = await bcrypt.hash(updates.password, 10);
+        }
+
+        const user = await User.findByIdAndUpdate(id, { $set: userUpdates }, { new: true });
+        if (!user) return res.status(404).json({ message: 'User not found' });
+
+        // 2. Update Creator Profile if exists
+        if (updates.role === 'CREATOR' || user.role === 'CREATOR') {
+            // Check if creator profile exists
+            let creator = await Creator.findOne({ user: id });
+
+            if (!creator && updates.role === 'CREATOR') {
+                // Create if not exists but role is creators
+                creator = new Creator({ user: id });
+            }
+
+            if (creator) {
+                const creatorUpdates: any = {};
+                const allowedCreatorFields = [
+                    'isVerified', 'isHot', 'rankingPriority', 'verificationStatus',
+                    'displayName', 'bio', 'price'
+                ];
+
+                allowedCreatorFields.forEach(field => {
+                    // check both root level updates (mixed) or specific creator object
+                    if (updates[field] !== undefined) creatorUpdates[field] = updates[field];
+                    if (updates.creatorProfile && updates.creatorProfile[field] !== undefined) {
+                        creatorUpdates[field] = updates.creatorProfile[field];
+                    }
+                });
+
+                // Sync isVerified
+                if (updates.isVerified !== undefined) {
+                    creatorUpdates.isVerified = updates.isVerified;
+                    await User.findByIdAndUpdate(id, { isVerified: updates.isVerified });
+                }
+
+                await Creator.findOneAndUpdate({ user: id }, { $set: creatorUpdates });
+            }
+        }
 
         res.json(user);
     } catch (error: any) {
