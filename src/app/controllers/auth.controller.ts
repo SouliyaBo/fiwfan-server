@@ -5,7 +5,7 @@ import Agency from '../models/agency.model';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
-import { sendVerificationEmail } from '../../utils/email';
+import { sendVerificationEmail, sendResetPasswordEmail } from '../../utils/email';
 
 export const forgotPassword = async (req: Request, res: Response) => {
     try {
@@ -26,17 +26,12 @@ export const forgotPassword = async (req: Request, res: Response) => {
 
         await user.save();
 
-        // In a real app, send email here.
-        // For this demo/dev, return the token so frontend can use it.
-        // Construct the reset URL dynamically
-        const frontendUrl = process.env.FRONTEND_URL || req.get('origin') || 'http://localhost:3000';
-        const resetUrl = `${frontendUrl}/auth?mode=reset&token=${resetToken}`;
+        // Send real email
+        await sendResetPasswordEmail(user.email, resetToken);
 
         res.status(200).json({
             success: true,
-            message: "Email sent (simulated)",
-            resetLink: resetUrl, // Frontend needs this to display in dev mode
-            browsingUrl: resetUrl // Legacy support if needed
+            message: "Email sent successfully"
         });
 
     } catch (error: any) {

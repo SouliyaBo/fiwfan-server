@@ -72,3 +72,42 @@ export const sendVerificationEmail = async (to: string, token: string) => {
 
     return sendEmail(to, 'ยืนยันอีเมลของคุณ - Phusao', emailBody);
 };
+
+export const sendResetPasswordEmail = async (to: string, token: string) => {
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    const resetLink = `${frontendUrl}/auth?mode=reset&token=${token}`;
+
+    const emailBody = `
+        <div style="font-family: 'Helvetica Neue', Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333; line-height: 1.6;">
+            <div style="text-align: center; padding: 20px 0; border-bottom: 1px solid #eee;">
+                <h2 style="color: #F84E6E; margin: 0;">รีเซ็ตรหัสผ่าน</h2>
+            </div>
+            
+            <div style="padding: 30px 20px;">
+                <p style="font-size: 16px;">สวัสดีครับ,</p>
+                <p style="font-size: 16px;">เราได้รับคำขอให้รีเซ็ตรหัสผ่านสำหรับบัญชี Phusao ของคุณ หากคุณเป็นผู้ส่งคำขอนี้ กรุณาคลิกที่ปุ่มด้านล่างเพื่อตั้งรหัสผ่านใหม่:</p>
+                
+                <div style="text-align: center; margin: 30px 0;">
+                    <a href="${resetLink}" style="background-color: #F84E6E; color: white; padding: 14px 28px; text-decoration: none; border-radius: 50px; font-weight: bold; font-size: 16px; display: inline-block; box-shadow: 0 4px 6px rgba(248, 78, 110, 0.2);">ตั้งรหัสผ่านใหม่</a>
+                </div>
+                
+                <p style="font-size: 14px; color: #666; margin-top: 30px;">
+                    ลิงก์นี้จะหมดอายุใน 15 นาที<br>
+                    หากคุณไม่ได้ส่งคำขอนี้ สามารถเพิกเฉยต่ออีเมลนี้ได้ รหัสผ่านของคุณจะยังคงเดิม
+                </p>
+
+                <p style="font-size: 14px; color: #666; margin-top: 10px;">
+                    หากคลิกปุ่มไม่ได้ ให้คัดลอกลิงก์นี้:<br>
+                    <a href="${resetLink}" style="color: #F84E6E; word-break: break-all;">${resetLink}</a>
+                </p>
+            </div>
+
+            <div style="text-align: center; padding-top: 30px; font-size: 14px; color: #888;">
+                <p style="margin-bottom: 5px;">ขอแสดงความนับถือ,</p>
+                <p style="margin-top: 0; font-weight: bold; color: #F84E6E;">ทีมงาน Phusao.com</p>
+            </div>
+        </div>
+    `;
+
+    return sendEmail(to, 'รีเซ็ตรหัสผ่าน - Phusao', emailBody);
+};
