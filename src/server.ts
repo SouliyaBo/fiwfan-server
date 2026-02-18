@@ -45,6 +45,8 @@ import planRoutes from './app/routes/plan.routes';
 app.use('/plans', planRoutes);
 import jobRoutes from './app/routes/job.routes';
 app.use('/jobs', jobRoutes);
+import adminRoutes from './app/routes/admin.routes';
+app.use('/admin', adminRoutes);
 
 // Post Routes
 import { createPost } from './app/controllers/post.controller';

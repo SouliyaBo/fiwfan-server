@@ -236,7 +236,8 @@ export const login = async (req: Request, res: Response) => {
                 displayName: user.displayName,
                 age: user.age, // Return age
                 email: user.email,
-                province: user.province
+                province: user.province,
+                permissions: user.permissions
             }
         });
     } catch (error: any) {
@@ -264,11 +265,6 @@ export const telegramLogin = async (req: Request, res: Response) => {
 
         const secretKey = crypto.createHash('sha256').update(botToken).digest();
         const hmac = crypto.createHmac('sha256', secretKey).update(dataCheckString).digest('hex');
-
-        // Debugging logs (careful not to expose sensitive info in prod logs if possible, or temporary)
-        console.log("Received Hash:", hash);
-        console.log("Calculated HMAC:", hmac);
-        console.log("Data String:", dataCheckString);
 
         if (process.env.NODE_ENV === 'development' && hash === 'mock_hash_for_dev') {
             // Bypass for testing
@@ -409,7 +405,7 @@ export const completeTelegramRegistration = async (req: Request, res: Response) 
 
 export const telegramResetPasswordRequest = async (req: Request, res: Response) => {
     try {
-        const { id, first_name, username, photo_url, auth_date, hash } = req.body;
+        const { id, auth_date, hash } = req.body;
         const botToken = process.env.TELEGRAM_BOT_TOKEN;
 
         if (!botToken) {

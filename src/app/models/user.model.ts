@@ -4,6 +4,7 @@ export enum Role {
     USER = 'USER',
     CREATOR = 'CREATOR',
     ADMIN = 'ADMIN',
+    SUPER_ADMIN = 'SUPER_ADMIN',
     AGENCY = 'AGENCY'
 }
 
@@ -14,6 +15,7 @@ export interface IUser extends Document {
     displayName?: string;
     avatarUrl?: string;
     role: Role;
+    permissions?: string[];
     phoneNumber?: string;
     lineId?: string;
     isCreator: boolean;
@@ -59,6 +61,7 @@ const UserSchema: Schema = new Schema({
     displayName: { type: String },
     avatarUrl: { type: String },
     role: { type: String, enum: Object.values(Role), default: Role.USER },
+    permissions: { type: [String], default: [] },
     phoneNumber: { type: String },
     lineId: { type: String },
     isCreator: { type: Boolean, default: false },
