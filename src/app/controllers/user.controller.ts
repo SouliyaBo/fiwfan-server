@@ -170,8 +170,7 @@ export const updatePreferences = async (req: Request | any, res: Response) => {
 
 export const getUsers = async (req: Request | any, res: Response) => {
     try {
-        // @ts-ignore
-        if (req.user.role !== 'ADMIN') {
+        if (!['ADMIN', 'SUPER_ADMIN'].includes(req.user.role)) {
             return res.status(403).json({ message: 'Access denied' });
         }
 
@@ -223,8 +222,7 @@ export const getUsers = async (req: Request | any, res: Response) => {
 
 export const updateUserStatus = async (req: Request | any, res: Response) => {
     try {
-        // @ts-ignore
-        if (req.user.role !== 'ADMIN') {
+        if (!['ADMIN', 'SUPER_ADMIN'].includes(req.user.role)) {
             return res.status(403).json({ message: 'Access denied' });
         }
 
@@ -242,8 +240,7 @@ export const updateUserStatus = async (req: Request | any, res: Response) => {
 
 export const updateUserByAdmin = async (req: Request | any, res: Response) => {
     try {
-        // @ts-ignore
-        if (req.user.role !== 'ADMIN') {
+        if (!['ADMIN', 'SUPER_ADMIN'].includes(req.user.role)) {
             return res.status(403).json({ message: 'Access denied' });
         }
 

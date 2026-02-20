@@ -59,7 +59,7 @@ export const resetPassword = async (req: Request, res: Response) => {
 
         await user.save();
 
-        const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET || 'secret', { expiresIn: '1d' });
+        const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET!, { expiresIn: '1d' });
 
         res.status(200).json({
             success: true,
@@ -200,7 +200,6 @@ export const verifyEmail = async (req: Request, res: Response) => {
 
 export const login = async (req: Request, res: Response) => {
     try {
-        console.log(req.body);
         const { email, username, password } = req.body;
         const identifier = email || username;
 
@@ -221,10 +220,10 @@ export const login = async (req: Request, res: Response) => {
         }
 
         const isMatch = await bcrypt.compare(password, user.password);
-        console.log(isMatch);
+
         if (!isMatch) return res.status(401).json({ message: 'Invalid credentials' });
 
-        const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET || 'secret', { expiresIn: '1d' });
+        const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET!, { expiresIn: '1d' });
 
         res.json({
             token,
@@ -298,7 +297,7 @@ export const telegramLogin = async (req: Request, res: Response) => {
         }
 
         // 4. Generate Token
-        const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET || 'secret', { expiresIn: '1d' });
+        const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET!, { expiresIn: '1d' });
 
         res.json({
             token,
@@ -383,7 +382,7 @@ export const completeTelegramRegistration = async (req: Request, res: Response) 
             await newAgency.save();
         }
 
-        const token = jwt.sign({ id: newUser._id, role: newUser.role }, process.env.JWT_SECRET || 'secret', { expiresIn: '1d' });
+        const token = jwt.sign({ id: newUser._id, role: newUser.role }, process.env.JWT_SECRET!, { expiresIn: '1d' });
 
         res.status(201).json({
             token,

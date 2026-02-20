@@ -4,6 +4,18 @@ import User from '../models/user.model';
 import Subscription, { SubscriptionStatus } from '../models/subscription.model';
 import Setting from '../models/setting.model';
 
+// Lightweight endpoint for sitemap — returns ALL creators without filters
+export const getCreatorsForSitemap = async (req: Request, res: Response) => {
+    try {
+        const creators = await Creator.find({})
+            .select('_id displayName updatedAt location province zones')
+            .lean();
+        res.json(creators);
+    } catch (error: any) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
 export const getCreators = async (req: any, res: Response) => {
     try {
         const { location, usePreferences, name, lineId, gender, province, country, ageMin, ageMax, heightMin, heightMax, weightMin, weightMax, chestMin, chestMax, waistMin, waistMax, hipsMin, hipsMax } = req.query;

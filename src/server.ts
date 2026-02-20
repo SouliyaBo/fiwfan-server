@@ -1,12 +1,16 @@
-import express from 'express'; // Restart Triggered Again
+import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
+import mongoSanitize from 'express-mongo-sanitize';
 import connectDB from './configs/database';
 import authRoutes from './app/routes/auth.routes';
 import creatorRoutes from './app/routes/creator.routes';
 import userRoutes from './app/routes/user.routes';
 import fileRoutes from './app/routes/file';
 import agencyRoutes from './app/routes/agency.routes';
+import { authenticate } from './app/middleware/auth.middleware';
 
 dotenv.config();
 
@@ -17,20 +21,77 @@ connectDB();
 
 app.set('trust proxy', 1);
 
-// Middleware
-// Middleware
-app.use(cors({
-    origin: true, // Allow any origin
-    credentials: true // Allow cookies/headers
-}));
-app.use(express.json());
+// ============================================================
+// Security Middleware
+// ============================================================
 
+// Helmet — adds security HTTP headers
+app.use(helmet());
+
+// CORS — whitelist allowed origins
+const allowedOrigins = [
+    'https://phusao.com',
+    'https://www.phusao.com',
+    'https://admin.phusao.com',
+    process.env.FRONTEND_URL,
+    process.env.ADMIN_URL,
+].filter(Boolean) as string[];
+
+if (process.env.NODE_ENV === 'development') {
+    allowedOrigins.push('http://localhost:3000', 'http://localhost:3001', 'http://localhost:3002', 'http://127.0.0.1:3000', 'http://127.0.0.1:3001');
+}
+
+app.use(cors({
+    origin: (origin, callback) => {
+        // Allow requests with no origin (mobile apps, curl, etc.)
+        if (!origin || allowedOrigins.includes(origin)) {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
+    credentials: true
+}));
+
+// Body parser with size limit
+app.use(express.json({ limit: '1mb' }));
+
+// MongoDB query sanitization — prevents NoSQL injection
+app.use(mongoSanitize());
+
+// Rate Limiting — Auth endpoints
+const authLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 15, // 15 attempts per window
+    message: { error: 'Too many attempts, please try again later' },
+    standardHeaders: true,
+    legacyHeaders: false,
+});
+
+// Rate Limiting — General API
+const generalLimiter = rateLimit({
+    windowMs: 1 * 60 * 1000, // 1 minute
+    max: 100, // 100 requests per minute
+    message: { error: 'Too many requests, please try again later' },
+    standardHeaders: true,
+    legacyHeaders: false,
+});
+
+// Apply general rate limiter to all routes
+app.use(generalLimiter);
+
+// ============================================================
 // Routes
-app.use('/auth', authRoutes);
+// ============================================================
+
+// Auth routes — with stricter rate limiting
+app.use('/auth', authLimiter, authRoutes);
+
 app.use('/creators', creatorRoutes);
 app.use('/users', userRoutes);
 app.use('/files', fileRoutes);
 app.use('/agencies', agencyRoutes);
+
 import paymentRoutes from './app/routes/payment.routes';
 app.use('/payments', paymentRoutes);
 import settingRoutes from './app/routes/setting.routes';
@@ -50,13 +111,12 @@ app.use('/admin', adminRoutes);
 
 // Post Routes
 import { createPost } from './app/controllers/post.controller';
-import { authenticate } from './app/middleware/auth.middleware';
 app.post('/posts', authenticate, createPost);
 
-// Upload Routes
+// Upload Routes — PROTECTED with authentication
 import { upload, handleUpload, handleMultipleUpload } from './app/controllers/upload.controller';
-app.post('/upload', upload.single('file'), handleUpload);
-app.post('/upload/multiple', upload.array('images', 10), handleMultipleUpload);
+app.post('/upload', authenticate, upload.single('file'), handleUpload);
+app.post('/upload/multiple', authenticate, upload.array('images', 10), handleMultipleUpload);
 app.use('/uploads', express.static('public/uploads'));
 
 app.get('/', (req, res) => {
