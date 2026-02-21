@@ -3,7 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
-import mongoSanitize from 'express-mongo-sanitize';
+
 import connectDB from './configs/database';
 import authRoutes from './app/routes/auth.routes';
 import creatorRoutes from './app/routes/creator.routes';
@@ -56,8 +56,7 @@ app.use(cors({
 // Body parser with size limit
 app.use(express.json({ limit: '1mb' }));
 
-// MongoDB query sanitization — prevents NoSQL injection
-app.use(mongoSanitize());
+
 
 // Rate Limiting — Auth endpoints
 const authLimiter = rateLimit({
