@@ -6,6 +6,7 @@ const auth_middleware_1 = require("../middleware/auth.middleware");
 const creator_controller_1 = require("../controllers/creator.controller");
 const router = (0, express_1.Router)();
 router.get('/', auth_middleware_1.optionalAuthenticate, creator_controller_1.getCreators);
+router.get('/sitemap', creator_controller_1.getCreatorsForSitemap);
 router.get('/zones', creator_controller_1.getZoneStats);
 router.get('/recommended', creator_controller_1.getRecommendedCreators);
 router.patch('/me', auth_middleware_1.authenticate, creator_controller_1.updateCreatorProfile);

@@ -47,6 +47,7 @@ const AgencySchema = new mongoose_1.Schema({
     lineId: { type: String },
     phone: { type: String },
     website: { type: String },
+    country: { type: String, default: 'Thailand' },
     isVerified: { type: Boolean, default: false },
     kycStatus: {
         type: String,

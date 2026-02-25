@@ -40,6 +40,7 @@ var Role;
     Role["USER"] = "USER";
     Role["CREATOR"] = "CREATOR";
     Role["ADMIN"] = "ADMIN";
+    Role["SUPER_ADMIN"] = "SUPER_ADMIN";
     Role["AGENCY"] = "AGENCY";
 })(Role || (exports.Role = Role = {}));
 const UserSchema = new mongoose_1.Schema({
@@ -49,8 +50,11 @@ const UserSchema = new mongoose_1.Schema({
     displayName: { type: String },
     avatarUrl: { type: String },
     role: { type: String, enum: Object.values(Role), default: Role.USER },
+    permissions: { type: [String], default: [] },
+    phoneNumber: { type: String },
     lineId: { type: String },
     isCreator: { type: Boolean, default: false },
+    isActive: { type: Boolean, default: true },
     // Verification
     isVerified: { type: Boolean, default: false },
     verificationToken: { type: String, select: false },

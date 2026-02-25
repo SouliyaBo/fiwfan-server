@@ -16,4 +16,7 @@ router.post('/favorites', auth_middleware_1.authenticate, user_controller_2.togg
 router.get('/favorites', auth_middleware_1.authenticate, user_controller_2.getMyFavorites);
 router.post('/views', auth_middleware_1.authenticate, user_controller_2.recordView);
 router.get('/history', auth_middleware_1.authenticate, user_controller_2.getHistory);
+// Admin Action
+// Admin Action
+router.put('/:id/admin', auth_middleware_1.authenticate, user_controller_1.updateUserByAdmin);
 exports.default = router;

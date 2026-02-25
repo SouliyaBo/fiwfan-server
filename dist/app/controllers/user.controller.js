@@ -45,10 +45,11 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.updateUserStatus = exports.getUsers = exports.updatePreferences = exports.getMyFavorites = exports.getHistory = exports.recordView = exports.toggleFavorite = exports.updateProfile = exports.getProfile = void 0;
+exports.updateUserByAdmin = exports.updateUserStatus = exports.getUsers = exports.updatePreferences = exports.getMyFavorites = exports.getHistory = exports.recordView = exports.toggleFavorite = exports.updateProfile = exports.getProfile = void 0;
 const user_model_1 = __importDefault(require("../models/user.model"));
 const creator_model_1 = __importDefault(require("../models/creator.model"));
 const subscription_model_1 = __importStar(require("../models/subscription.model"));
+const bcrypt_1 = __importDefault(require("bcrypt"));
 const getProfile = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const userId = req.user.id;
@@ -193,8 +194,7 @@ const updatePreferences = (req, res) => __awaiter(void 0, void 0, void 0, functi
 exports.updatePreferences = updatePreferences;
 const getUsers = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        // @ts-ignore
-        if (req.user.role !== 'ADMIN') {
+        if (!['ADMIN', 'SUPER_ADMIN'].includes(req.user.role)) {
             return res.status(403).json({ message: 'Access denied' });
         }
         const { search, role, page = 1, limit = 20 } = req.query;
@@ -220,7 +220,7 @@ const getUsers = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
             const userObj = u.toObject();
             if (u.role === 'CREATOR') {
                 const Creator = (yield Promise.resolve().then(() => __importStar(require('../models/creator.model')))).default;
-                const creator = yield Creator.findOne({ user: u._id }).select('isVerified _id verificationStatus verificationData');
+                const creator = yield Creator.findOne({ user: u._id });
                 if (creator) {
                     userObj.creatorProfile = creator;
                 }
@@ -240,8 +240,7 @@ const getUsers = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
 exports.getUsers = getUsers;
 const updateUserStatus = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        // @ts-ignore
-        if (req.user.role !== 'ADMIN') {
+        if (!['ADMIN', 'SUPER_ADMIN'].includes(req.user.role)) {
             return res.status(403).json({ message: 'Access denied' });
         }
         const { id } = req.params;
@@ -256,3 +255,64 @@ const updateUserStatus = (req, res) => __awaiter(void 0, void 0, void 0, functio
     }
 });
 exports.updateUserStatus = updateUserStatus;
+const updateUserByAdmin = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        if (!['ADMIN', 'SUPER_ADMIN'].includes(req.user.role)) {
+            return res.status(403).json({ message: 'Access denied' });
+        }
+        const { id } = req.params;
+        const updates = req.body;
+        // 1. Update User
+        const userUpdates = {};
+        const allowedUserFields = [
+            'username', 'email', 'displayName', 'role', 'isActive',
+            'lineId', 'phoneNumber'
+        ];
+        allowedUserFields.forEach(field => {
+            if (updates[field] !== undefined)
+                userUpdates[field] = updates[field];
+        });
+        // Password update
+        if (updates.password && updates.password.trim() !== "") {
+            userUpdates.password = yield bcrypt_1.default.hash(updates.password, 10);
+        }
+        const user = yield user_model_1.default.findByIdAndUpdate(id, { $set: userUpdates }, { new: true });
+        if (!user)
+            return res.status(404).json({ message: 'User not found' });
+        // 2. Update Creator Profile if exists
+        if (updates.role === 'CREATOR' || user.role === 'CREATOR') {
+            // Check if creator profile exists
+            let creator = yield creator_model_1.default.findOne({ user: id });
+            if (!creator && updates.role === 'CREATOR') {
+                // Create if not exists but role is creators
+                creator = new creator_model_1.default({ user: id });
+            }
+            if (creator) {
+                const creatorUpdates = {};
+                const allowedCreatorFields = [
+                    'isVerified', 'isHot', 'rankingPriority', 'verificationStatus',
+                    'displayName', 'bio', 'price'
+                ];
+                allowedCreatorFields.forEach(field => {
+                    // check both root level updates (mixed) or specific creator object
+                    if (updates[field] !== undefined)
+                        creatorUpdates[field] = updates[field];
+                    if (updates.creatorProfile && updates.creatorProfile[field] !== undefined) {
+                        creatorUpdates[field] = updates.creatorProfile[field];
+                    }
+                });
+                // Sync isVerified
+                if (updates.isVerified !== undefined) {
+                    creatorUpdates.isVerified = updates.isVerified;
+                    yield user_model_1.default.findByIdAndUpdate(id, { isVerified: updates.isVerified });
+                }
+                yield creator_model_1.default.findOneAndUpdate({ user: id }, { $set: creatorUpdates });
+            }
+        }
+        res.json(user);
+    }
+    catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+});
+exports.updateUserByAdmin = updateUserByAdmin;

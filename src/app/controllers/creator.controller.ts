@@ -139,7 +139,11 @@ export const getCreators = async (req: any, res: Response) => {
         }
 
         const allCreators = await Creator.find(query)
-            .populate('user', 'username email avatarUrl')
+            .populate({
+                path: 'user',
+                select: 'username email avatarUrl isActive',
+                match: { isActive: true }
+            })
             .sort({ rankingPriority: -1, isVerified: -1, updatedAt: -1 });
 
         // Filter out creators whose user account might have been deleted (null user)
@@ -281,10 +285,18 @@ export const getCreatorById = async (req: Request, res: Response) => {
 
         // 4. Fallback: Search by exact displayName matches (if still not found)
         if (!creator) {
-            creator = await Creator.findOne({ displayName: id }).populate('user', 'username email avatarUrl').populate('posts');
+            creator = await Creator.findOne({ displayName: id }).populate('user', 'username email avatarUrl isActive').populate('posts');
         }
 
         if (!creator) return res.status(404).json({ message: 'Creator not found' });
+
+        // Ensure user is active and creator is verified
+        if (creator.user && (creator.user as any).isActive === false) {
+            return res.status(404).json({ message: 'Creator not found' });
+        }
+        if (!creator.isVerified) {
+            return res.status(404).json({ message: 'Creator not found' });
+        }
 
         // Fetch active subscription for this creator's user
         let activeSubscription = null;
@@ -406,8 +418,9 @@ export const getRecommendedCreators = async (req: Request, res: Response) => {
             matchStage._id = { $ne: new (await import('mongoose')).Types.ObjectId(excludeId) };
         }
 
-        // Filter only those accepting work (or undefined for legacy)
+        // Filter only those accepting work (or undefined for legacy) and verified
         matchStage.isAcceptingWork = { $ne: false };
+        matchStage.isVerified = true;
 
         if (Object.keys(matchStage).length > 0) {
             pipeline.push({ $match: matchStage });
@@ -424,6 +437,7 @@ export const getRecommendedCreators = async (req: Request, res: Response) => {
         // Since we filtered by activeSubs, we know they have one, but we need the details (planType etc)
         const result = (await Promise.all(populatedRecommended.map(async (creator: any) => {
             if (!creator.user) return null;
+            if (creator.user.isActive === false) return null; // Filter out banned users
 
             const sub = await Subscription.findOne({
                 user: creator.user._id || creator.user, // Handle populated or not
@@ -446,7 +460,7 @@ export const getRecommendedCreators = async (req: Request, res: Response) => {
 export const updateCreatorVerification = async (req: Request | any, res: Response) => {
     try {
         // @ts-ignore
-        if (req.user.role !== 'ADMIN') {
+        if (!['ADMIN', 'SUPER_ADMIN'].includes(req.user.role)) {
             return res.status(403).json({ message: 'Access denied' });
         }
 

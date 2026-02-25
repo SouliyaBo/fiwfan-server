@@ -45,11 +45,24 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getKycStatus = exports.submitKyc = exports.updateCreatorVerification = exports.getRecommendedCreators = exports.updateCreatorProfile = exports.getCreatorById = exports.getZoneStats = exports.getCreators = void 0;
+exports.getKycStatus = exports.submitKyc = exports.updateCreatorVerification = exports.getRecommendedCreators = exports.updateCreatorProfile = exports.getCreatorById = exports.getZoneStats = exports.getCreators = exports.getCreatorsForSitemap = void 0;
 const creator_model_1 = __importDefault(require("../models/creator.model"));
 const user_model_1 = __importDefault(require("../models/user.model"));
 const subscription_model_1 = __importStar(require("../models/subscription.model"));
 const setting_model_1 = __importDefault(require("../models/setting.model"));
+// Lightweight endpoint for sitemap — returns ALL creators without filters
+const getCreatorsForSitemap = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const creators = yield creator_model_1.default.find({})
+            .select('_id displayName updatedAt location province zones')
+            .lean();
+        res.json(creators);
+    }
+    catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+});
+exports.getCreatorsForSitemap = getCreatorsForSitemap;
 const getCreators = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { location, usePreferences, name, lineId, gender, province, country, ageMin, ageMax, heightMin, heightMax, weightMin, weightMax, chestMin, chestMax, waistMin, waistMax, hipsMin, hipsMax } = req.query;
@@ -180,7 +193,11 @@ const getCreators = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
             }
         }
         const allCreators = yield creator_model_1.default.find(query)
-            .populate('user', 'username email avatarUrl')
+            .populate({
+            path: 'user',
+            select: 'username email avatarUrl isActive',
+            match: { isActive: true }
+        })
             .sort({ rankingPriority: -1, isVerified: -1, updatedAt: -1 });
         // Filter out creators whose user account might have been deleted (null user)
         const creators = allCreators.filter(c => c.user);
@@ -304,10 +321,17 @@ const getCreatorById = (req, res) => __awaiter(void 0, void 0, void 0, function*
         }
         // 4. Fallback: Search by exact displayName matches (if still not found)
         if (!creator) {
-            creator = yield creator_model_1.default.findOne({ displayName: id }).populate('user', 'username email avatarUrl').populate('posts');
+            creator = yield creator_model_1.default.findOne({ displayName: id }).populate('user', 'username email avatarUrl isActive').populate('posts');
         }
         if (!creator)
             return res.status(404).json({ message: 'Creator not found' });
+        // Ensure user is active and creator is verified
+        if (creator.user && creator.user.isActive === false) {
+            return res.status(404).json({ message: 'Creator not found' });
+        }
+        if (!creator.isVerified) {
+            return res.status(404).json({ message: 'Creator not found' });
+        }
         // Fetch active subscription for this creator's user
         let activeSubscription = null;
         if (creator.user) {
@@ -414,8 +438,9 @@ const getRecommendedCreators = (req, res) => __awaiter(void 0, void 0, void 0, f
         if (excludeId && typeof excludeId === 'string') {
             matchStage._id = { $ne: new (yield Promise.resolve().then(() => __importStar(require('mongoose')))).Types.ObjectId(excludeId) };
         }
-        // Filter only those accepting work (or undefined for legacy)
+        // Filter only those accepting work (or undefined for legacy) and verified
         matchStage.isAcceptingWork = { $ne: false };
+        matchStage.isVerified = true;
         if (Object.keys(matchStage).length > 0) {
             pipeline.push({ $match: matchStage });
         }
@@ -428,6 +453,8 @@ const getRecommendedCreators = (req, res) => __awaiter(void 0, void 0, void 0, f
         const result = (yield Promise.all(populatedRecommended.map((creator) => __awaiter(void 0, void 0, void 0, function* () {
             if (!creator.user)
                 return null;
+            if (creator.user.isActive === false)
+                return null; // Filter out banned users
             const sub = yield subscription_model_1.default.findOne({
                 user: creator.user._id || creator.user, // Handle populated or not
                 status: subscription_model_1.SubscriptionStatus.ACTIVE,
@@ -445,7 +472,7 @@ exports.getRecommendedCreators = getRecommendedCreators;
 const updateCreatorVerification = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         // @ts-ignore
-        if (req.user.role !== 'ADMIN') {
+        if (!['ADMIN', 'SUPER_ADMIN'].includes(req.user.role)) {
             return res.status(403).json({ message: 'Access denied' });
         }
         const { id } = req.params;

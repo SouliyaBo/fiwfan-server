@@ -32,8 +32,8 @@ const PLANS = [
         type: 'CREATOR'
     },
     {
-        id: 'STAR',
-        name: 'STAR',
+        id: 'POPULAR',
+        name: 'POPULAR',
         description: 'Boost visibility 100%',
         features: ['แสดงรายชื่อเป็นอันดับ 2', 'ผลการค้นหา: อันดับ 2'],
         prices: [
@@ -41,13 +41,13 @@ const PLANS = [
             { duration: '2 Weeks', price: 1518, days: 14 },
             { duration: '4 Weeks', price: 2844, days: 28 }
         ],
-        theme: 'blue',
+        theme: 'teal',
         rankingPriority: 50,
         type: 'CREATOR'
     },
     {
-        id: 'POPULAR',
-        name: 'POPULAR',
+        id: 'RISING_STAR',
+        name: 'RISING STAR',
         description: 'Normal visibility',
         features: ['แสดงรายชื่อเป็นอันดับ 3', 'ผลการค้นหา: อันดับ 3'],
         prices: [
@@ -55,7 +55,7 @@ const PLANS = [
             { duration: '2 Weeks', price: 872, days: 14 },
             { duration: '4 Weeks', price: 1646, days: 28 }
         ],
-        theme: 'teal',
+        theme: 'blue',
         rankingPriority: 10,
         type: 'CREATOR'
     },

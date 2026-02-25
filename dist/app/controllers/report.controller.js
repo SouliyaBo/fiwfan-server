@@ -85,15 +85,15 @@ const getReports = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
             const reportObj = r.toObject();
             if (r.targetType === 'USER') {
                 const User = (yield Promise.resolve().then(() => __importStar(require('../models/user.model')))).default;
-                reportObj.target = yield User.findById(r.targetId, 'username email');
+                reportObj.target = yield User.findById(r.targetId, 'username displayName email avatarUrl');
             }
             else if (r.targetType === 'CREATOR') {
                 const Creator = (yield Promise.resolve().then(() => __importStar(require('../models/creator.model')))).default;
-                reportObj.target = yield Creator.findById(r.targetId, 'displayName bio images');
+                reportObj.target = yield Creator.findById(r.targetId, 'displayName bio images user');
             }
             else if (r.targetType === 'REVIEW') {
                 const Review = (yield Promise.resolve().then(() => __importStar(require('../models/review.model')))).default;
-                reportObj.target = yield Review.findById(r.targetId);
+                reportObj.target = yield Review.findById(r.targetId).populate('user', 'username displayName avatarUrl');
             }
             return reportObj;
         })));

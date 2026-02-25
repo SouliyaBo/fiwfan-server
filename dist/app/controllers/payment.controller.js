@@ -45,7 +45,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getMySubscription = exports.subscribe = exports.getPlans = exports.rejectSubscription = exports.approveSubscription = exports.getPendingSubscriptions = void 0;
+exports.getMySubscription = exports.subscribe = exports.getPlans = exports.rejectSubscription = exports.approveSubscription = exports.getPaymentHistory = exports.getPendingSubscriptions = void 0;
 const subscription_model_1 = __importStar(require("../models/subscription.model"));
 const creator_model_1 = __importDefault(require("../models/creator.model"));
 const plan_model_1 = __importDefault(require("../models/plan.model"));
@@ -66,6 +66,21 @@ const getPendingSubscriptions = (req, res) => __awaiter(void 0, void 0, void 0, 
     }
 });
 exports.getPendingSubscriptions = getPendingSubscriptions;
+const getPaymentHistory = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        if (req.user.role !== 'ADMIN')
+            return res.status(403).json({ message: 'Access denied' });
+        const subscriptions = yield subscription_model_1.default.find({ status: { $ne: subscription_model_1.SubscriptionStatus.PENDING } })
+            .populate('user', 'displayName username email')
+            .sort({ updatedAt: -1 }) // Sort by last updated
+            .limit(100); // Limit to last 100 for now
+        res.json(subscriptions);
+    }
+    catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+});
+exports.getPaymentHistory = getPaymentHistory;
 const approveSubscription = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         if (req.user.role !== 'ADMIN')
@@ -103,9 +118,9 @@ const approveSubscription = (req, res) => __awaiter(void 0, void 0, void 0, func
             // Fallback for legacy hardcoded values if plan not found in DB
             if (subscription.planType === 'THE_ANGEL' || subscription.planType === 'SUPER_STAR')
                 priority = 100;
-            else if (subscription.planType === 'STAR')
-                priority = 50;
             else if (subscription.planType === 'POPULAR')
+                priority = 50;
+            else if (subscription.planType === 'RISING_STAR' || subscription.planType === 'STAR')
                 priority = 10;
         }
         yield creator_model_1.default.findOneAndUpdate({ user: subscription.user }, { $set: { rankingPriority: priority } });

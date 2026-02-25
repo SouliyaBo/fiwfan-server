@@ -12,42 +12,29 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.sendVerificationEmail = exports.sendEmail = void 0;
-const aws_sdk_1 = __importDefault(require("aws-sdk"));
+exports.sendResetPasswordEmail = exports.sendVerificationEmail = exports.sendEmail = void 0;
+const resend_1 = require("resend");
 const dotenv_1 = __importDefault(require("dotenv"));
 dotenv_1.default.config();
-// Initialize SES
-const ses = new aws_sdk_1.default.SES({
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-    region: process.env.AWS_REGION || 'ap-southeast-1'
-});
+// Initialize Resend
+const resend = new resend_1.Resend(process.env.RESEND_API_KEY);
 const sendEmail = (to, subject, body) => __awaiter(void 0, void 0, void 0, function* () {
-    const params = {
-        Source: process.env.AWS_SENDER_EMAIL || 'noreply@phusao.com', // Replace with your verified sender email
-        Destination: {
-            ToAddresses: [to]
-        },
-        Message: {
-            Subject: {
-                Data: subject
-            },
-            Body: {
-                Html: {
-                    Data: body
-                }
-            }
-        }
-    };
     try {
-        const result = yield ses.sendEmail(params).promise();
-        console.log(`Email sent to ${to}: ${result.MessageId}`);
-        return result;
+        const { data, error } = yield resend.emails.send({
+            from: 'Phusao <noreply@phusao.com>', // Verified domain
+            to: [to],
+            subject: subject,
+            html: body,
+        });
+        if (error) {
+            console.error(`Error sending email to ${to}:`, error);
+            throw new Error(error.message);
+        }
+        console.log(`Email sent to ${to}: ${data === null || data === void 0 ? void 0 : data.id}`);
+        return data;
     }
     catch (error) {
         console.error(`Error sending email to ${to}:`, error);
-        // For development/sandbox safety, we might fail silently or just log
-        // But throwing helps debug
         throw error;
     }
 });
@@ -95,3 +82,40 @@ const sendVerificationEmail = (to, token) => __awaiter(void 0, void 0, void 0, f
     return (0, exports.sendEmail)(to, 'ยืนยันอีเมลของคุณ - Phusao', emailBody);
 });
 exports.sendVerificationEmail = sendVerificationEmail;
+const sendResetPasswordEmail = (to, token) => __awaiter(void 0, void 0, void 0, function* () {
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    const resetLink = `${frontendUrl}/auth?mode=reset&token=${token}`;
+    const emailBody = `
+        <div style="font-family: 'Helvetica Neue', Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333; line-height: 1.6;">
+            <div style="text-align: center; padding: 20px 0; border-bottom: 1px solid #eee;">
+                <h2 style="color: #F84E6E; margin: 0;">รีเซ็ตรหัสผ่าน</h2>
+            </div>
+            
+            <div style="padding: 30px 20px;">
+                <p style="font-size: 16px;">สวัสดีครับ,</p>
+                <p style="font-size: 16px;">เราได้รับคำขอให้รีเซ็ตรหัสผ่านสำหรับบัญชี Phusao ของคุณ หากคุณเป็นผู้ส่งคำขอนี้ กรุณาคลิกที่ปุ่มด้านล่างเพื่อตั้งรหัสผ่านใหม่:</p>
+                
+                <div style="text-align: center; margin: 30px 0;">
+                    <a href="${resetLink}" style="background-color: #F84E6E; color: white; padding: 14px 28px; text-decoration: none; border-radius: 50px; font-weight: bold; font-size: 16px; display: inline-block; box-shadow: 0 4px 6px rgba(248, 78, 110, 0.2);">ตั้งรหัสผ่านใหม่</a>
+                </div>
+                
+                <p style="font-size: 14px; color: #666; margin-top: 30px;">
+                    ลิงก์นี้จะหมดอายุใน 15 นาที<br>
+                    หากคุณไม่ได้ส่งคำขอนี้ สามารถเพิกเฉยต่ออีเมลนี้ได้ รหัสผ่านของคุณจะยังคงเดิม
+                </p>
+
+                <p style="font-size: 14px; color: #666; margin-top: 10px;">
+                    หากคลิกปุ่มไม่ได้ ให้คัดลอกลิงก์นี้:<br>
+                    <a href="${resetLink}" style="color: #F84E6E; word-break: break-all;">${resetLink}</a>
+                </p>
+            </div>
+
+            <div style="text-align: center; padding-top: 30px; font-size: 14px; color: #888;">
+                <p style="margin-bottom: 5px;">ขอแสดงความนับถือ,</p>
+                <p style="margin-top: 0; font-weight: bold; color: #F84E6E;">ทีมงาน Phusao.com</p>
+            </div>
+        </div>
+    `;
+    return (0, exports.sendEmail)(to, 'รีเซ็ตรหัสผ่าน - Phusao', emailBody);
+});
+exports.sendResetPasswordEmail = sendResetPasswordEmail;

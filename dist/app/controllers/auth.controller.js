@@ -52,6 +52,7 @@ const agency_model_1 = __importDefault(require("../models/agency.model"));
 const bcrypt_1 = __importDefault(require("bcrypt"));
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const crypto_1 = __importDefault(require("crypto"));
+const email_1 = require("../../utils/email");
 const forgotPassword = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { email } = req.body;
@@ -66,16 +67,11 @@ const forgotPassword = (req, res) => __awaiter(void 0, void 0, void 0, function*
         user.resetPasswordToken = resetPasswordToken;
         user.resetPasswordExpires = new Date(resetPasswordExpires); // Use Date object
         yield user.save();
-        // In a real app, send email here.
-        // For this demo/dev, return the token so frontend can use it.
-        // Construct the reset URL dynamically
-        const frontendUrl = process.env.FRONTEND_URL || req.get('origin') || 'http://localhost:3000';
-        const resetUrl = `${frontendUrl}/auth?mode=reset&token=${resetToken}`;
+        // Send real email
+        yield (0, email_1.sendResetPasswordEmail)(user.email, resetToken);
         res.status(200).json({
             success: true,
-            message: "Email sent (simulated)",
-            resetLink: resetUrl, // Frontend needs this to display in dev mode
-            browsingUrl: resetUrl // Legacy support if needed
+            message: "Email sent successfully"
         });
     }
     catch (error) {
@@ -98,7 +94,7 @@ const resetPassword = (req, res) => __awaiter(void 0, void 0, void 0, function* 
         user.resetPasswordToken = undefined;
         user.resetPasswordExpires = undefined;
         yield user.save();
-        const token = jsonwebtoken_1.default.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET || 'secret', { expiresIn: '1d' });
+        const token = jsonwebtoken_1.default.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '1d' });
         res.status(200).json({
             success: true,
             token,
@@ -143,8 +139,8 @@ const register = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
             age: age, // Save calculated age
             role: finalRole,
             isCreator: finalRole === user_model_1.Role.CREATOR,
-            isVerified: true, // TEMPORARY: Bypass email verification
-            // verificationToken: verificationToken // Not needed if bypassed
+            isVerified: false, // Enforce email verification
+            verificationToken: verificationToken
         });
         yield newUser.save();
         if (finalRole === user_model_1.Role.CREATOR) {
@@ -166,20 +162,21 @@ const register = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
             yield newAgency.save();
         }
         // Send Verification Email
-        /*
         try {
-            await sendVerificationEmail(newUser.email, verificationToken);
-        } catch (emailError) {
-            console.error("Failed to send verification email:", emailError);
+            yield (0, email_1.sendVerificationEmail)(newUser.email, verificationToken);
         }
-        */
+        catch (emailError) {
+            console.error("Failed to send verification email:", emailError);
+            // Optional: You might want to delete the user if email fails, or allow them to resend later.
+            // For now, we will just log it and they can try to login -> trigger resend logic (if implemented)
+        }
         // Return token for auto-login or just success
-        const token = jsonwebtoken_1.default.sign({ id: newUser._id, role: newUser.role }, process.env.JWT_SECRET || 'secret', { expiresIn: '1d' });
+        // const token = jwt.sign({ id: newUser._id, role: newUser.role }, process.env.JWT_SECRET || 'secret', { expiresIn: '1d' });
         res.status(201).json({
-            message: 'Registration successful.',
-            verifyRequired: false,
+            message: 'Registration successful. Please check your email to verify your account.',
+            verifyRequired: true,
             email: newUser.email,
-            token,
+            // token, // Do not return token if verification is required
             user: {
                 id: newUser._id,
                 username: newUser.username,
@@ -223,7 +220,6 @@ const verifyEmail = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
 exports.verifyEmail = verifyEmail;
 const login = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        console.log(req.body);
         const { email, username, password } = req.body;
         const identifier = email || username;
         if (!identifier || !password) {
@@ -235,11 +231,13 @@ const login = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
         if (!user || !user.password) {
             return res.status(401).json({ message: 'Invalid credentials' });
         }
+        if (!user.isVerified && user.role !== user_model_1.Role.ADMIN) {
+            return res.status(403).json({ message: 'Please verify your email before logging in.' });
+        }
         const isMatch = yield bcrypt_1.default.compare(password, user.password);
-        console.log(isMatch);
         if (!isMatch)
             return res.status(401).json({ message: 'Invalid credentials' });
-        const token = jsonwebtoken_1.default.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET || 'secret', { expiresIn: '1d' });
+        const token = jsonwebtoken_1.default.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '1d' });
         res.json({
             token,
             user: {
@@ -250,7 +248,8 @@ const login = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
                 displayName: user.displayName,
                 age: user.age, // Return age
                 email: user.email,
-                province: user.province
+                province: user.province,
+                permissions: user.permissions
             }
         });
     }
@@ -275,10 +274,6 @@ const telegramLogin = (req, res) => __awaiter(void 0, void 0, void 0, function* 
         const dataCheckString = dataCheckArr.join('\n');
         const secretKey = crypto_1.default.createHash('sha256').update(botToken).digest();
         const hmac = crypto_1.default.createHmac('sha256', secretKey).update(dataCheckString).digest('hex');
-        // Debugging logs (careful not to expose sensitive info in prod logs if possible, or temporary)
-        console.log("Received Hash:", hash);
-        console.log("Calculated HMAC:", hmac);
-        console.log("Data String:", dataCheckString);
         if (process.env.NODE_ENV === 'development' && hash === 'mock_hash_for_dev') {
             // Bypass for testing
         }
@@ -307,7 +302,7 @@ const telegramLogin = (req, res) => __awaiter(void 0, void 0, void 0, function* 
             yield user.save();
         }
         // 4. Generate Token
-        const token = jsonwebtoken_1.default.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET || 'secret', { expiresIn: '1d' });
+        const token = jsonwebtoken_1.default.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '1d' });
         res.json({
             token,
             user: {
@@ -384,7 +379,7 @@ const completeTelegramRegistration = (req, res) => __awaiter(void 0, void 0, voi
             });
             yield newAgency.save();
         }
-        const token = jsonwebtoken_1.default.sign({ id: newUser._id, role: newUser.role }, process.env.JWT_SECRET || 'secret', { expiresIn: '1d' });
+        const token = jsonwebtoken_1.default.sign({ id: newUser._id, role: newUser.role }, process.env.JWT_SECRET, { expiresIn: '1d' });
         res.status(201).json({
             token,
             user: {
@@ -405,7 +400,7 @@ const completeTelegramRegistration = (req, res) => __awaiter(void 0, void 0, voi
 exports.completeTelegramRegistration = completeTelegramRegistration;
 const telegramResetPasswordRequest = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const { id, first_name, username, photo_url, auth_date, hash } = req.body;
+        const { id, auth_date, hash } = req.body;
         const botToken = process.env.TELEGRAM_BOT_TOKEN;
         if (!botToken) {
             return res.status(500).json({ message: 'Server configuration error: TELEGRAM_BOT_TOKEN missing' });

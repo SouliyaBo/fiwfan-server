@@ -38,8 +38,8 @@ const mongoose_1 = __importStar(require("mongoose"));
 var PlanType;
 (function (PlanType) {
     PlanType["THE_ANGEL"] = "THE_ANGEL";
-    PlanType["STAR"] = "STAR";
     PlanType["POPULAR"] = "POPULAR";
+    PlanType["RISING_STAR"] = "RISING_STAR";
     PlanType["TOURIST_ONE_NIGHT"] = "TOURIST_ONE_NIGHT";
     PlanType["TOURIST_WEEKEND"] = "TOURIST_WEEKEND";
     PlanType["TOURIST_VVIP"] = "TOURIST_VVIP";

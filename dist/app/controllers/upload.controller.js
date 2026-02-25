@@ -19,10 +19,23 @@ const helper_1 = require("../files/helper");
 const files_1 = require("../files");
 // Configure storage (Memory Storage)
 const storage = multer_1.default.memoryStorage();
-// Create upload middleware
+// Allowed MIME types
+const ALLOWED_MIME_TYPES = [
+    'image/jpeg', 'image/png', 'image/webp', 'image/gif',
+    'video/mp4', 'video/quicktime',
+];
+// Create upload middleware with file type validation
 exports.upload = (0, multer_1.default)({
     storage: storage,
-    limits: { fileSize: 5 * 1024 * 1024 } // 5MB limit
+    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+    fileFilter: (req, file, cb) => {
+        if (ALLOWED_MIME_TYPES.includes(file.mimetype)) {
+            cb(null, true);
+        }
+        else {
+            cb(new Error(`Invalid file type: ${file.mimetype}. Allowed: ${ALLOWED_MIME_TYPES.join(', ')}`));
+        }
+    }
 });
 const uploadToS3 = (file) => __awaiter(void 0, void 0, void 0, function* () {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);

@@ -148,7 +148,7 @@ const getJobs = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
             status: job_model_1.JobStatus.ACTIVE,
             expiresAt: { $gt: now }
         })
-            .populate('user', 'displayName avatarUrl username')
+            .populate('user', 'displayName avatarUrl username age gender province country')
             .sort({ isPinned: -1, isHighlighted: -1, createdAt: -1 }) // Pinned first, then Highlighted, then Newest
             .limit(Number(limit));
         res.json(jobs);
