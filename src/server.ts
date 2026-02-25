@@ -37,7 +37,7 @@ const allowedOrigins = [
     process.env.ADMIN_URL,
 ].filter(Boolean) as string[];
 
-if (process.env.NODE_ENV === 'development') {
+if (process.env.NODE_ENV !== 'production') {
     allowedOrigins.push('http://localhost:3000', 'http://localhost:3001', 'http://localhost:3002', 'http://127.0.0.1:3000', 'http://127.0.0.1:3001');
 }
 
