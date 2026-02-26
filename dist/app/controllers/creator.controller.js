@@ -196,7 +196,7 @@ const getCreators = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
             .populate({
             path: 'user',
             select: 'username email avatarUrl isActive',
-            match: { isActive: true }
+            match: { isActive: { $ne: false } }
         })
             .sort({ rankingPriority: -1, isVerified: -1, updatedAt: -1 });
         // Filter out creators whose user account might have been deleted (null user)

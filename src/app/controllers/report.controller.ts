@@ -33,7 +33,7 @@ export const createReport = async (req: Request, res: Response) => {
 export const getReports = async (req: AuthRequest, res: Response) => {
     try {
         // Check Admin Role
-        if (req.user.role !== 'ADMIN') {
+        if (req.user.role !== 'ADMIN' && req.user.role !== 'SUPER_ADMIN') {
             return res.status(403).json({ message: 'Access denied: Admins only' });
         }
 
@@ -68,7 +68,7 @@ export const getReports = async (req: AuthRequest, res: Response) => {
 export const updateReportStatus = async (req: Request, res: Response) => {
     try {
         // @ts-ignore
-        if (req.user.role !== 'ADMIN') {
+        if (req.user.role !== 'ADMIN' && req.user.role !== 'SUPER_ADMIN') {
             return res.status(403).json({ message: 'Access denied: Admins only' });
         }
 
@@ -113,6 +113,11 @@ export const updateReportStatus = async (req: Request, res: Response) => {
             // Also hide/unverify the creator profile so they don't show up
             const CreatorModel = (await import('../models/creator.model')).default;
             await CreatorModel.findOneAndUpdate({ user: userIdToBan }, { isVerified: false });
+        }
+        else if (action === 'BAN_REVIEW' && report.targetType === 'REVIEW') {
+            const Review = (await import('../models/review.model')).default;
+            // Delete the review
+            await Review.findByIdAndDelete(report.targetId);
         }
 
         res.status(200).json(report);

@@ -9,7 +9,7 @@ import Plan from '../models/plan.model';
 export const getPendingSubscriptions = async (req: any, res: Response) => {
     try {
         // Check Admin Role (Assuming req.user.role is populated by auth middleware)
-        if (req.user.role !== 'ADMIN') {
+        if (req.user.role !== 'ADMIN' && req.user.role !== 'SUPER_ADMIN') {
             return res.status(403).json({ message: 'Access denied' });
         }
 
@@ -25,7 +25,7 @@ export const getPendingSubscriptions = async (req: any, res: Response) => {
 
 export const getPaymentHistory = async (req: any, res: Response) => {
     try {
-        if (req.user.role !== 'ADMIN') return res.status(403).json({ message: 'Access denied' });
+        if (req.user.role !== 'ADMIN' && req.user.role !== 'SUPER_ADMIN') return res.status(403).json({ message: 'Access denied' });
 
         const subscriptions = await Subscription.find({ status: { $ne: SubscriptionStatus.PENDING } })
             .populate('user', 'displayName username email')
@@ -40,7 +40,7 @@ export const getPaymentHistory = async (req: any, res: Response) => {
 
 export const approveSubscription = async (req: any, res: Response) => {
     try {
-        if (req.user.role !== 'ADMIN') return res.status(403).json({ message: 'Access denied' });
+        if (req.user.role !== 'ADMIN' && req.user.role !== 'SUPER_ADMIN') return res.status(403).json({ message: 'Access denied' });
 
         const { id } = req.params;
         const subscription = await Subscription.findById(id);
@@ -100,7 +100,7 @@ export const approveSubscription = async (req: any, res: Response) => {
 
 export const rejectSubscription = async (req: any, res: Response) => {
     try {
-        if (req.user.role !== 'ADMIN') return res.status(403).json({ message: 'Access denied' });
+        if (req.user.role !== 'ADMIN' && req.user.role !== 'SUPER_ADMIN') return res.status(403).json({ message: 'Access denied' });
 
         const { id } = req.params;
         const subscription = await Subscription.findById(id);

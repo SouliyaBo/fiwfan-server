@@ -58,6 +58,13 @@ app.use(express.json({ limit: '1mb' }));
 
 
 
+// ============================================================
+// Rate Limiting
+// ============================================================
+
+// Static files (exempt from rate limits)
+app.use('/uploads', express.static('public/uploads'));
+
 // Rate Limiting — Auth endpoints
 const authLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
@@ -70,21 +77,21 @@ const authLimiter = rateLimit({
 // Rate Limiting — General API
 const generalLimiter = rateLimit({
     windowMs: 1 * 60 * 1000, // 1 minute
-    max: 100, // 100 requests per minute
+    max: 1000, // 1000 requests per minute
     message: { error: 'Too many requests, please try again later' },
     standardHeaders: true,
     legacyHeaders: false,
 });
 
 // Apply general rate limiter to all routes
-app.use(generalLimiter);
+// app.use(generalLimiter);
 
 // ============================================================
 // Routes
 // ============================================================
 
-// Auth routes — with stricter rate limiting
-app.use('/auth', authLimiter, authRoutes);
+// Auth routes — with stricter rate limiting (Temporarily disabled)
+app.use('/auth', authRoutes);
 
 app.use('/creators', creatorRoutes);
 app.use('/users', userRoutes);
@@ -116,7 +123,6 @@ app.post('/posts', authenticate, createPost);
 import { upload, handleUpload, handleMultipleUpload } from './app/controllers/upload.controller';
 app.post('/upload', authenticate, upload.single('file'), handleUpload);
 app.post('/upload/multiple', authenticate, upload.array('images', 10), handleMultipleUpload);
-app.use('/uploads', express.static('public/uploads'));
 
 app.get('/', (req, res) => {
     res.send('Fiwfan API (Mongoose Edition) is running!');

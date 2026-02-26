@@ -142,7 +142,7 @@ export const getCreators = async (req: any, res: Response) => {
             .populate({
                 path: 'user',
                 select: 'username email avatarUrl isActive',
-                match: { isActive: true }
+                match: { isActive: { $ne: false } }
             })
             .sort({ rankingPriority: -1, isVerified: -1, updatedAt: -1 });
 

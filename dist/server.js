@@ -50,6 +50,11 @@ app.use((0, cors_1.default)({
 }));
 // Body parser with size limit
 app.use(express_1.default.json({ limit: '1mb' }));
+// ============================================================
+// Rate Limiting
+// ============================================================
+// Static files (exempt from rate limits)
+app.use('/uploads', express_1.default.static('public/uploads'));
 // Rate Limiting — Auth endpoints
 const authLimiter = (0, express_rate_limit_1.default)({
     windowMs: 15 * 60 * 1000, // 15 minutes
@@ -61,18 +66,18 @@ const authLimiter = (0, express_rate_limit_1.default)({
 // Rate Limiting — General API
 const generalLimiter = (0, express_rate_limit_1.default)({
     windowMs: 1 * 60 * 1000, // 1 minute
-    max: 100, // 100 requests per minute
+    max: 1000, // 1000 requests per minute
     message: { error: 'Too many requests, please try again later' },
     standardHeaders: true,
     legacyHeaders: false,
 });
 // Apply general rate limiter to all routes
-app.use(generalLimiter);
+// app.use(generalLimiter);
 // ============================================================
 // Routes
 // ============================================================
-// Auth routes — with stricter rate limiting
-app.use('/auth', authLimiter, auth_routes_1.default);
+// Auth routes — with stricter rate limiting (Temporarily disabled)
+app.use('/auth', auth_routes_1.default);
 app.use('/creators', creator_routes_1.default);
 app.use('/users', user_routes_1.default);
 app.use('/files', file_1.default);
@@ -100,7 +105,6 @@ app.post('/posts', auth_middleware_1.authenticate, post_controller_1.createPost)
 const upload_controller_1 = require("./app/controllers/upload.controller");
 app.post('/upload', auth_middleware_1.authenticate, upload_controller_1.upload.single('file'), upload_controller_1.handleUpload);
 app.post('/upload/multiple', auth_middleware_1.authenticate, upload_controller_1.upload.array('images', 10), upload_controller_1.handleMultipleUpload);
-app.use('/uploads', express_1.default.static('public/uploads'));
 app.get('/', (req, res) => {
     res.send('Fiwfan API (Mongoose Edition) is running!');
 });
